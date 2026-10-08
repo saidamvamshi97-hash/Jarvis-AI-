@@ -1,333 +1,103 @@
-// ==========================================
-// J.A.R.V.I.S. HUD & CORE INTELLIGENCE ENGINE
-// ==========================================
-
-// --- 1. DOM Elements ---
+// --- Elements ---
 const chat = document.getElementById("chat");
 const input = document.getElementById("msg");
 const sendBtn = document.getElementById("send");
 const micBtn = document.getElementById("mic");
-const arcCore = document.getElementById("arc-core") || document.querySelector(".core");
-const statusPanel = document.querySelector(".status");
-const clockEl = document.getElementById("hud-clock");
-const canvas = document.getElementById("waveform");
-const canvasCtx = canvas ? canvas.getContext("2d") : null;
+const arcCore = document.getElementById("arc-core");
+const batteryRow = document.getElementById("battery-row");
 
-// --- 2. Live HUD Clock ---
-function startClock() {
-  function updateTime() {
-    if (!clockEl) return;
-    const now = new Date();
-    clockEl.innerText = now.toTimeString().split(" ")[0];
-  }
-  updateTime();
-  setInterval(updateTime, 1000);
-}
-startClock();
+// --- Model Configuration with Fallbacks ---
+// If gemini-flash-latest hits temporary load limits, fallback triggers
+const MODEL_TIERS = ["gemini-flash-latest", "gemini-2.5-flash", "gemini-2.0-flash"];
 
-// --- 3. Futuristic Web Audio Synthesizer & Analyser ---
-const AudioContextClass = window.AudioContext || window.webkitAudioContext;
-let audioCtx = null;
-let analyserNode = null;
-
-function initAudio() {
-  if (!audioCtx && AudioContextClass) {
-    audioCtx = new AudioContextClass();
-    analyserNode = audioCtx.createAnalyser();
-    analyserNode.fftSize = 64;
-    startWaveformLoop();
-  }
-}
-
-function playTone(freq, type, duration, delay = 0) {
-  try {
-    initAudio();
-    if (!audioCtx) return;
-    const osc = audioCtx.createOscillator();
-    const gain = audioCtx.createGain();
-
-    osc.type = type;
-    osc.frequency.setValueAtTime(freq, audioCtx.currentTime + delay);
-    
-    gain.gain.setValueAtTime(0.08, audioCtx.currentTime + delay);
-    gain.gain.exponentialRampToValueAtTime(0.0001, audioCtx.currentTime + delay + duration);
-
-    osc.connect(gain);
-    gain.connect(analyserNode || audioCtx.destination);
-    if (analyserNode) analyserNode.connect(audioCtx.destination);
-
-    osc.start(audioCtx.currentTime + delay);
-    osc.stop(audioCtx.currentTime + delay + duration);
-  } catch (e) {
-    console.warn("Audio effect error:", e);
-  }
-}
-
-const UI_AUDIO = {
-  click: () => playTone(880, "sine", 0.08),
-  listening: () => {
-    playTone(520, "sine", 0.1, 0);
-    playTone(780, "sine", 0.15, 0.08);
+// --- State and Memory ---
+let conversationHistory = [
+  {
+    role: "user",
+    parts: [{ text: "You are J.A.R.V.I.S, Tony Stark's AI console. Address the user as Boss. Respond sharply in 1 or 2 concise sentences." }]
   },
-  complete: () => {
-    playTone(659, "triangle", 0.1, 0);
-    playTone(880, "sine", 0.18, 0.1);
-  },
-  error: () => {
-    playTone(180, "sawtooth", 0.25, 0);
+  {
+    role: "model",
+    parts: [{ text: "Systems online and fully operational, Boss." }]
   }
-};
+];
 
-// --- 4. Live Audio Waveform Canvas Animation ---
-function startWaveformLoop() {
-  if (!canvasCtx || !analyserNode) return;
-  const bufferLength = analyserNode.frequencyBinCount;
-  const dataArray = new Uint8Array(bufferLength);
-
-  function draw() {
-    requestAnimationFrame(draw);
-    analyserNode.getByteFrequencyData(dataArray);
-
-    canvasCtx.clearRect(0, 0, canvas.width, canvas.height);
-
-    const barWidth = (canvas.width / bufferLength) * 1.5;
-    let x = 0;
-
-    for (let i = 0; i < bufferLength; i++) {
-      const barHeight = (dataArray[i] / 255) * canvas.height;
-      canvasCtx.fillStyle = `rgba(0, 255, 255, ${dataArray[i] / 255 + 0.2})`;
-      canvasCtx.fillRect(x, canvas.height - barHeight, barWidth, barHeight);
-      x += barWidth + 2;
-    }
-  }
-  draw();
-}
-
-// --- 5. Reactive Arc Reactor HUD Controller ---
-function setReactorState(state) {
+function setReactor(state) {
   if (!arcCore) return;
-  const centerRing = arcCore.querySelector(".center");
-  if (!centerRing) return;
+  const c = arcCore.querySelector(".center");
+  if (!c) return;
 
   if (state === "listening") {
-    centerRing.style.boxShadow = "0 0 35px #ff0055";
-    centerRing.style.background = "#ff0055";
+    c.style.background = "#ff0055";
+    c.style.boxShadow = "0 0 35px #ff0055";
   } else if (state === "thinking") {
-    centerRing.style.boxShadow = "0 0 45px #ffaa00";
-    centerRing.style.background = "#ffaa00";
-  } else if (state === "speaking") {
-    centerRing.style.boxShadow = "0 0 45px #00ffaa";
-    centerRing.style.background = "#00ffaa";
+    c.style.background = "#ffb700";
+    c.style.boxShadow = "0 0 35px #ffb700";
   } else {
-    centerRing.style.boxShadow = "0 0 30px #0ff";
-    centerRing.style.background = "#0ff";
+    c.style.background = "#00e5ff";
+    c.style.boxShadow = "0 0 35px #00e5ff";
   }
 }
 
-// --- 6. Mobile-Optimized Speech Synthesis Engine ---
-function speak(text) {
-  if (!("speechSynthesis" in window)) {
-    console.warn("Speech synthesis not supported in this browser.");
-    return;
-  }
-
-  window.speechSynthesis.cancel();
-
-  const cleanText = text.replace(/[*#_`~]/g, "").trim();
-  const utterance = new SpeechSynthesisUtterance(cleanText);
-
-  utterance.rate = 1.0;
-  utterance.pitch = 0.95;
-  utterance.lang = "en-US";
-
-  const voices = window.speechSynthesis.getVoices();
-  const enVoice = voices.find(v => v.lang.startsWith("en-GB") || v.lang.startsWith("en-US") || v.lang.startsWith("en"));
-  if (enVoice) {
-    utterance.voice = enVoice;
-  }
-
-  utterance.onstart = () => {
-    setReactorState("speaking");
-  };
-  utterance.onend = () => {
-    setReactorState(isContinuousListening ? "listening" : "idle");
-  };
-  utterance.onerror = (e) => {
-    console.error("SpeechSynthesis error:", e);
-    setReactorState(isContinuousListening ? "listening" : "idle");
-  };
-
-  window.speechSynthesis.speak(utterance);
-}
-
-// Pre-load voices and unlock browser audio on user interaction
-if ("speechSynthesis" in window) {
-  window.speechSynthesis.onvoiceschanged = () => {
-    window.speechSynthesis.getVoices();
-  };
-
-  const unlockAudioEngine = () => {
-    initAudio();
-    window.speechSynthesis.speak(new SpeechSynthesisUtterance(""));
-    window.removeEventListener("touchstart", unlockAudioEngine);
-    window.removeEventListener("click", unlockAudioEngine);
-  };
-
-  window.addEventListener("touchstart", unlockAudioEngine, { once: true });
-  window.addEventListener("click", unlockAudioEngine, { once: true });
-}
-
-// --- 7. Hardware & Environmental Telemetry ---
-let currentWeatherReport = "Weather telemetry unavailable at this time, Boss.";
-
-async function initTelemetry() {
-  // Device Battery Monitor
-  if (navigator.getBattery && statusPanel) {
-    try {
-      const battery = await navigator.getBattery();
-      const updateBatteryUI = () => {
-        let batRow = document.getElementById("diag-battery");
-        if (!batRow) {
-          batRow = document.createElement("div");
-          batRow.id = "diag-battery";
-          batRow.className = "row";
-          statusPanel.appendChild(batRow);
-        }
-        const level = Math.round(battery.level * 100);
-        const status = battery.charging ? "CHARGING" : "ONLINE";
-        batRow.innerHTML = `<span>POWER LEVEL</span><span class="on">${level}% [${status}]</span>`;
-      };
-
-      updateBatteryUI();
-      battery.addEventListener("levelchange", updateBatteryUI);
-      battery.addEventListener("chargingchange", updateBatteryUI);
-    } catch (e) {
-      console.warn("Battery telemetry unavailable:", e);
-    }
-  }
-
-  // Live Weather Telemetry via Geolocation
-  if (navigator.geolocation && statusPanel) {
-    navigator.geolocation.getCurrentPosition(async (pos) => {
-      try {
-        const lat = pos.coords.latitude;
-        const lon = pos.coords.longitude;
-        const res = await fetch(`https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current_weather=true`);
-        const data = await res.json();
-
-        if (data && data.current_weather) {
-          const temp = Math.round(data.current_weather.temperature);
-          const wind = data.current_weather.windspeed;
-          currentWeatherReport = `Current temperature is ${temp}°C with wind speeds of ${wind} kilometers per hour.`;
-
-          let weatherRow = document.getElementById("diag-weather");
-          if (!weatherRow) {
-            weatherRow = document.createElement("div");
-            weatherRow.id = "diag-weather";
-            weatherRow.className = "row";
-            statusPanel.appendChild(weatherRow);
-          }
-          weatherRow.innerHTML = `<span>LOCAL ATMO</span><span class="on">${temp}°C [${wind} KM/H]</span>`;
-        }
-      } catch (err) {
-        console.warn("Weather fetch failed:", err);
-      }
-    }, (err) => {
-      console.warn("Geolocation bypassed:", err.message);
-    });
-  }
-}
-initTelemetry();
-
-// --- 8. Multi-Turn Persistent Conversation Memory ---
-const INITIAL_SYSTEM_PROMPT = {
-  role: "user",
-  parts: [{ 
-    text: "You are J.A.R.V.I.S, Tony Stark's futuristic, ultra-intelligent AI assistant. Always address the user as Boss. Keep your responses concise (1 to 2 sentences), sharp, confident, and professional." 
-  }]
-};
-
-let conversationHistory = [];
-try {
-  const cachedHistory = sessionStorage.getItem("JARVIS_HISTORY");
-  conversationHistory = cachedHistory ? JSON.parse(cachedHistory) : [
-    INITIAL_SYSTEM_PROMPT,
-    { role: "model", parts: [{ text: "Systems online and fully operational, Boss. Ready for instructions." }] }
-  ];
-} catch (e) {
-  conversationHistory = [INITIAL_SYSTEM_PROMPT];
-}
-
-function persistMemory() {
-  try {
-    sessionStorage.setItem("JARVIS_HISTORY", JSON.stringify(conversationHistory.slice(-10)));
-  } catch (e) {}
-}
-
-// --- 9. Append Message Helper ---
 function add(text, who) {
   if (!chat) return;
   const d = document.createElement("div");
   d.className = "msg " + who;
-  d.innerText = text;
+  d.innerHTML = text;
   chat.appendChild(d);
   chat.scrollTop = chat.scrollHeight;
 }
 
-// --- 10. Autonomous Command & Web Action Router ---
-function executeAutonomousAction(command) {
-  const text = command.toLowerCase().trim();
+function speak(text) {
+  if (!("speechSynthesis" in window)) return;
+  window.speechSynthesis.cancel();
+  const clean = text.replace(/[*#_`~]/g, "").trim();
+  const u = new SpeechSynthesisUtterance(clean);
+  u.lang = "en-US";
+  u.rate = 1.05;
+  u.pitch = 0.95;
 
-  // Local Weather Briefing
-  if (text.includes("weather") || text.includes("temperature") || text.includes("atmospheric conditions")) {
-    setTimeout(() => {
-      speak(currentWeatherReport);
-      add("J.A.R.V.I.S: " + currentWeatherReport, "ai");
-    }, 600);
-    return true;
-  }
-  // Play Music Action
-  if (text.includes("play music") || text.includes("play song") || text.includes("play some music")) {
-    setTimeout(() => window.open("https://music.youtube.com", "_blank"), 1200);
-    return true;
-  }
-  // Open YouTube
-  if (text.startsWith("open youtube")) {
-    setTimeout(() => window.open("https://www.youtube.com", "_blank"), 1200);
-    return true;
-  }
-  // Maps & Location
-  if (text.includes("navigate to") || text.includes("where is")) {
-    const query = text.replace(/navigate to|where is/gi, "").trim();
-    if (query) {
-      setTimeout(() => window.open(`https://www.google.com/maps/search/${encodeURIComponent(query)}`, "_blank"), 1200);
-      return true;
-    }
-  }
-  // Google Search
-  if (text.startsWith("google ") || text.startsWith("search for ")) {
-    const query = text.replace(/google |search for /gi, "").trim();
-    if (query) {
-      setTimeout(() => window.open(`https://www.google.com/search?q=${encodeURIComponent(query)}`, "_blank"), 1200);
-      return true;
-    }
-  }
-  // Wikipedia Dossier
-  if (text.startsWith("lookup ") || text.startsWith("who is ")) {
-    const query = text.replace(/lookup |who is /gi, "").trim();
-    if (query) {
-      setTimeout(() => window.open(`https://en.wikipedia.org/wiki/${encodeURIComponent(query)}`, "_blank"), 1200);
-      return true;
-    }
-  }
-  return false;
+  const voices = window.speechSynthesis.getVoices();
+  const enVoice = voices.find(v => v.lang.startsWith("en-GB") || v.lang.startsWith("en"));
+  if (enVoice) u.voice = enVoice;
+
+  u.onstart = () => setReactor("listening");
+  u.onend = () => setReactor("idle");
+  u.onerror = () => setReactor("idle");
+
+  window.speechSynthesis.speak(u);
 }
 
-// --- 11. API Key Access ---
+// Unlock audio on mobile interaction
+window.addEventListener("touchstart", () => {
+  if ("speechSynthesis" in window) {
+    window.speechSynthesis.speak(new SpeechSynthesisUtterance(""));
+  }
+}, { once: true });
+
+// Battery Telemetry
+async function getBatteryStatus() {
+  if (navigator.getBattery && batteryRow) {
+    try {
+      const b = await navigator.getBattery();
+      const update = () => {
+        const level = Math.round(b.level * 100);
+        const status = b.charging ? "CHARGING" : "ONLINE";
+        batteryRow.innerHTML = `<span>POWER LEVEL</span><span class="status-val on">${level}% [${status}]</span>`;
+      };
+      update();
+      b.addEventListener("levelchange", update);
+      b.addEventListener("chargingchange", update);
+    } catch (e) {}
+  }
+}
+getBatteryStatus();
+
+// API Key Manager
 function getApiKey() {
   let key = localStorage.getItem("GEMINI_API_KEY");
   if (!key || key.trim() === "") {
-    key = prompt("Enter your Google Gemini API Key:");
+    key = prompt("Enter your Gemini API Key:");
     if (key && key.trim() !== "") {
       localStorage.setItem("GEMINI_API_KEY", key.trim());
       return key.trim();
@@ -337,180 +107,118 @@ function getApiKey() {
   return key.trim();
 }
 
-// --- 12. Core AI Pipeline ---
-async function askGemini(promptText) {
-  const currentKey = getApiKey();
-  if (!currentKey) {
-    add("J.A.R.V.I.S: API key required to operate.", "ai");
-    speak("API key required, Boss.");
+// AI Core Engine with Model Failover
+async function askJarvis(promptText) {
+  const key = getApiKey();
+  if (!key) {
+    add('<span class="prefix">J.A.R.V.I.S:</span> API Key required to initialize protocols.', 'ai');
     return;
   }
 
-  add("YOU: " + promptText, "user");
+  add(`<span class="prefix">YOU:</span> ${promptText}`, "user");
   if (input) input.value = "";
-  add("J.A.R.V.I.S: Processing...", "ai");
-  setReactorState("thinking");
+  add('<span class="prefix">J.A.R.V.I.S:</span> Processing...', 'ai');
+  setReactor("thinking");
 
-  conversationHistory.push({
-    role: "user",
-    parts: [{ text: promptText }]
-  });
+  conversationHistory.push({ role: "user", parts: [{ text: promptText }] });
 
-  executeAutonomousAction(promptText);
+  let success = false;
+  let reply = "";
 
-  try {
-    const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-flash-latest:generateContent?key=${currentKey}`;
-    const response = await fetch(url, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        contents: conversationHistory
-      })
-    });
+  for (let model of MODEL_TIERS) {
+    try {
+      const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${key}`;
+      const res = await fetch(url, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ contents: conversationHistory })
+      });
 
-    const data = await response.json();
+      const data = await res.json();
 
-    if (data.error) {
-      const errMsg = data.error.message || "Protocol mismatch";
-      chat.lastChild.innerText = "J.A.R.V.I.S: Error - " + errMsg;
-      UI_AUDIO.error();
-      speak("System error encountered, Boss.");
-      conversationHistory.pop();
-      setReactorState(isContinuousListening ? "listening" : "idle");
-
-      if (data.error.code === 400 || data.error.status === "INVALID_ARGUMENT") {
-        localStorage.removeItem("GEMINI_API_KEY");
+      if (data.error) {
+        if (data.error.code === 400 || data.error.status === "INVALID_ARGUMENT") {
+          localStorage.removeItem("GEMINI_API_KEY");
+          chat.lastChild.innerHTML = `<span class="prefix">J.A.R.V.I.S:</span> Key invalid. Resetting storage.`;
+          setReactor("idle");
+          return;
+        }
+        // If high-demand or rate limit, continue to the next model in tier
+        continue;
       }
-      return;
+
+      reply = data.candidates?.[0]?.content?.parts?.[0]?.text;
+      if (reply) {
+        success = true;
+        break;
+      }
+    } catch (e) {
+      continue;
     }
-
-    const reply = data.candidates?.[0]?.content?.parts?.[0]?.text || "All systems nominal, Boss.";
-    chat.lastChild.innerText = "J.A.R.V.I.S: " + reply;
-
-    conversationHistory.push({
-      role: "model",
-      parts: [{ text: reply }]
-    });
-    persistMemory();
-
-    UI_AUDIO.complete();
-    speak(reply);
-  } catch (err) {
-    chat.lastChild.innerText = "J.A.R.V.I.S: Uplink failed - " + err.message;
-    UI_AUDIO.error();
-    speak("Uplink disrupted, Boss.");
-    conversationHistory.pop();
-    setReactorState(isContinuousListening ? "listening" : "idle");
   }
+
+  if (success && reply) {
+    chat.lastChild.innerHTML = `<span class="prefix">J.A.R.V.I.S:</span> ${reply}`;
+    conversationHistory.push({ role: "model", parts: [{ text: reply }] });
+    speak(reply);
+  } else {
+    chat.lastChild.innerHTML = `<span class="prefix">J.A.R.V.I.S:</span> System busy across all network tiers. Try again shortly.`;
+    speak("High demand on network, Boss.");
+    conversationHistory.pop();
+  }
+
+  setReactor("idle");
 }
 
-// --- 13. Event Handlers ---
+// Action triggers
 if (sendBtn) {
   sendBtn.addEventListener("click", () => {
-    UI_AUDIO.click();
-    const text = input ? input.value.trim() : "";
-    if (text) askGemini(text);
+    const val = input ? input.value.trim() : "";
+    if (val) askJarvis(val);
   });
 }
 
 if (input) {
   input.addEventListener("keydown", (e) => {
     if (e.key === "Enter") {
-      UI_AUDIO.click();
-      const text = input.value.trim();
-      if (text) askGemini(text);
+      const val = input.value.trim();
+      if (val) askJarvis(val);
     }
   });
 }
 
-// --- 14. Continuous Wake-Word & Voice Recognition Protocol ---
-let isContinuousListening = false;
-let recognition = null;
-
+// Speech Recognition Trigger
 const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-
 if (SpeechRecognition && micBtn) {
-  recognition = new SpeechRecognition();
-  recognition.lang = "en-US";
-  recognition.continuous = true;
-  recognition.interimResults = false;
-
-  function startListeningLoop() {
-    try {
-      isContinuousListening = true;
-      micBtn.innerText = "⚡";
-      micBtn.style.background = "rgba(0, 255, 255, 0.4)";
-      micBtn.title = "Wake Word Active ('Hey Jarvis')";
-      UI_AUDIO.listening();
-      setReactorState("listening");
-      recognition.start();
-      add("SYSTEM: Hands-free wake-word active. Say 'Hey Jarvis...'", "ai");
-    } catch (e) {
-      console.warn("Recognition start error:", e);
-    }
-  }
-
-  function stopListeningLoop() {
-    isContinuousListening = false;
-    micBtn.innerText = "🎤";
-    micBtn.style.background = "";
-    micBtn.title = "Voice Command";
-    setReactorState("idle");
-    try {
-      recognition.stop();
-    } catch (e) {}
-  }
+  const rec = new SpeechRecognition();
+  rec.lang = "en-US";
+  rec.interimResults = false;
 
   micBtn.addEventListener("click", () => {
-    if (!isContinuousListening) {
-      startListeningLoop();
-    } else {
-      stopListeningLoop();
+    try {
+      setReactor("listening");
+      micBtn.innerText = "🔴";
+      rec.start();
+    } catch (e) {
+      rec.stop();
+      micBtn.innerText = "🎤";
+      setReactor("idle");
     }
   });
 
-  recognition.onresult = (event) => {
-    const lastResultIndex = event.results.length - 1;
-    const rawTranscript = event.results[lastResultIndex][0].transcript.trim();
-    const cleanLower = rawTranscript.toLowerCase();
-
-    if (cleanLower.includes("jarvis") || cleanLower.includes("hey jarvis")) {
-      const command = rawTranscript.replace(/hey jarvis|jarvis/gi, "").trim();
-      UI_AUDIO.click();
-
-      if (command.length > 0) {
-        if (input) input.value = command;
-        askGemini(command);
-      } else {
-        speak("Online and listening, Boss.");
-      }
-    }
+  rec.onresult = (e) => {
+    const transcript = e.results[0][0].transcript;
+    if (input) input.value = transcript;
+    askJarvis(transcript);
   };
 
-  recognition.onend = () => {
-    if (isContinuousListening) {
-      try {
-        recognition.start();
-      } catch (e) {
-        setTimeout(() => {
-          if (isContinuousListening) recognition.start();
-        }, 500);
-      }
-    } else {
-      micBtn.innerText = "🎤";
-      setReactorState("idle");
-    }
+  rec.onend = () => {
+    micBtn.innerText = "🎤";
+    setReactor("idle");
   };
 
-  recognition.onerror = (e) => {
-    if (e.error !== "no-speech") {
-      console.warn("Speech error:", e.error);
-    }
-    if (!isContinuousListening) {
-      micBtn.innerText = "🎤";
-      setReactorState("idle");
-    }
+  rec.onerror = () => {
+    micBtn.innerText = "🎤";
+    setReactor("idle");
   };
-} else if (micBtn) {
-  micBtn.style.display = "none";
 }

@@ -7,16 +7,35 @@ const chat = document.getElementById("chat");
 const input = document.getElementById("msg");
 const sendBtn = document.getElementById("send");
 const micBtn = document.getElementById("mic");
-const arcCore = document.querySelector(".core");
+const arcCore = document.getElementById("arc-core") || document.querySelector(".core");
 const statusPanel = document.querySelector(".status");
+const clockEl = document.getElementById("hud-clock");
+const canvas = document.getElementById("waveform");
+const canvasCtx = canvas ? canvas.getContext("2d") : null;
 
-// --- 2. Futuristic Web Audio Synthesizer (UI Tones) ---
+// --- 2. Live HUD Clock ---
+function startClock() {
+  function updateTime() {
+    if (!clockEl) return;
+    const now = new Date();
+    clockEl.innerText = now.toTimeString().split(" ")[0];
+  }
+  updateTime();
+  setInterval(updateTime, 1000);
+}
+startClock();
+
+// --- 3. Futuristic Web Audio Synthesizer & Analyser ---
 const AudioContextClass = window.AudioContext || window.webkitAudioContext;
 let audioCtx = null;
+let analyserNode = null;
 
 function initAudio() {
   if (!audioCtx && AudioContextClass) {
     audioCtx = new AudioContextClass();
+    analyserNode = audioCtx.createAnalyser();
+    analyserNode.fftSize = 64;
+    startWaveformLoop();
   }
 }
 
@@ -34,7 +53,8 @@ function playTone(freq, type, duration, delay = 0) {
     gain.gain.exponentialRampToValueAtTime(0.0001, audioCtx.currentTime + delay + duration);
 
     osc.connect(gain);
-    gain.connect(audioCtx.destination);
+    gain.connect(analyserNode || audioCtx.destination);
+    if (analyserNode) analyserNode.connect(audioCtx.destination);
 
     osc.start(audioCtx.currentTime + delay);
     osc.stop(audioCtx.currentTime + delay + duration);
@@ -58,7 +78,32 @@ const UI_AUDIO = {
   }
 };
 
-// --- 3. Reactive Arc Reactor HUD Controller ---
+// --- 4. Live Audio Waveform Canvas Animation ---
+function startWaveformLoop() {
+  if (!canvasCtx || !analyserNode) return;
+  const bufferLength = analyserNode.frequencyBinCount;
+  const dataArray = new Uint8Array(bufferLength);
+
+  function draw() {
+    requestAnimationFrame(draw);
+    analyserNode.getByteFrequencyData(dataArray);
+
+    canvasCtx.clearRect(0, 0, canvas.width, canvas.height);
+
+    const barWidth = (canvas.width / bufferLength) * 1.5;
+    let x = 0;
+
+    for (let i = 0; i < bufferLength; i++) {
+      const barHeight = (dataArray[i] / 255) * canvas.height;
+      canvasCtx.fillStyle = `rgba(0, 255, 255, ${dataArray[i] / 255 + 0.2})`;
+      canvasCtx.fillRect(x, canvas.height - barHeight, barWidth, barHeight);
+      x += barWidth + 2;
+    }
+  }
+  draw();
+}
+
+// --- 5. Reactive Arc Reactor HUD Controller ---
 function setReactorState(state) {
   if (!arcCore) return;
   const centerRing = arcCore.querySelector(".center");
@@ -79,17 +124,15 @@ function setReactorState(state) {
   }
 }
 
-// --- 4. Mobile-Optimized Speech Synthesis Engine ---
+// --- 6. Mobile-Optimized Speech Synthesis Engine ---
 function speak(text) {
   if (!("speechSynthesis" in window)) {
     console.warn("Speech synthesis not supported in this browser.");
     return;
   }
 
-  // Cancel any stalled audio utterances
   window.speechSynthesis.cancel();
 
-  // Strip Markdown characters (*, #, _, `, ~) so speech reads naturally
   const cleanText = text.replace(/[*#_`~]/g, "").trim();
   const utterance = new SpeechSynthesisUtterance(cleanText);
 
@@ -97,7 +140,6 @@ function speak(text) {
   utterance.pitch = 0.95;
   utterance.lang = "en-US";
 
-  // Select preferred English voice
   const voices = window.speechSynthesis.getVoices();
   const enVoice = voices.find(v => v.lang.startsWith("en-GB") || v.lang.startsWith("en-US") || v.lang.startsWith("en"));
   if (enVoice) {
@@ -135,7 +177,7 @@ if ("speechSynthesis" in window) {
   window.addEventListener("click", unlockAudioEngine, { once: true });
 }
 
-// --- 5. Hardware Telemetry & Real-Time Battery Monitor ---
+// --- 7. Hardware Telemetry & Real-Time Battery Monitor ---
 async function initTelemetry() {
   if (navigator.getBattery && statusPanel) {
     try {
@@ -163,7 +205,7 @@ async function initTelemetry() {
 }
 initTelemetry();
 
-// --- 6. Multi-Turn Persistent Conversation Memory ---
+// --- 8. Multi-Turn Persistent Conversation Memory ---
 const INITIAL_SYSTEM_PROMPT = {
   role: "user",
   parts: [{ 
@@ -188,7 +230,7 @@ function persistMemory() {
   } catch (e) {}
 }
 
-// --- 7. Append Message Helper ---
+// --- 9. Append Message Helper ---
 function add(text, who) {
   if (!chat) return;
   const d = document.createElement("div");
@@ -198,21 +240,18 @@ function add(text, who) {
   chat.scrollTop = chat.scrollHeight;
 }
 
-// --- 8. Autonomous Command & Web Action Router ---
+// --- 10. Autonomous Command & Web Action Router ---
 function executeAutonomousAction(command) {
   const text = command.toLowerCase().trim();
 
-  // Play music action
   if (text.includes("play music") || text.includes("play song") || text.includes("play some music")) {
     setTimeout(() => window.open("https://music.youtube.com", "_blank"), 1200);
     return true;
   }
-  // Open YouTube
   if (text.startsWith("open youtube")) {
     setTimeout(() => window.open("https://www.youtube.com", "_blank"), 1200);
     return true;
   }
-  // Maps & Location
   if (text.includes("navigate to") || text.includes("where is")) {
     const query = text.replace(/navigate to|where is/gi, "").trim();
     if (query) {
@@ -220,7 +259,6 @@ function executeAutonomousAction(command) {
       return true;
     }
   }
-  // Google Search
   if (text.startsWith("google ") || text.startsWith("search for ")) {
     const query = text.replace(/google |search for /gi, "").trim();
     if (query) {
@@ -228,7 +266,6 @@ function executeAutonomousAction(command) {
       return true;
     }
   }
-  // Wikipedia Dossier
   if (text.startsWith("lookup ") || text.startsWith("who is ")) {
     const query = text.replace(/lookup |who is /gi, "").trim();
     if (query) {
@@ -239,7 +276,7 @@ function executeAutonomousAction(command) {
   return false;
 }
 
-// --- 9. API Key Access ---
+// --- 11. API Key Access ---
 function getApiKey() {
   let key = localStorage.getItem("GEMINI_API_KEY");
   if (!key || key.trim() === "") {
@@ -253,7 +290,7 @@ function getApiKey() {
   return key.trim();
 }
 
-// --- 10. Core AI Pipeline ---
+// --- 12. Core AI Pipeline ---
 async function askGemini(promptText) {
   const currentKey = getApiKey();
   if (!currentKey) {
@@ -320,7 +357,7 @@ async function askGemini(promptText) {
   }
 }
 
-// --- 11. Event Handlers ---
+// --- 13. Event Handlers ---
 if (sendBtn) {
   sendBtn.addEventListener("click", () => {
     UI_AUDIO.click();
@@ -339,7 +376,7 @@ if (input) {
   });
 }
 
-// --- 12. Continuous Wake-Word & Voice Recognition Protocol ---
+// --- 14. Continuous Wake-Word & Voice Recognition Protocol ---
 let isContinuousListening = false;
 let recognition = null;
 

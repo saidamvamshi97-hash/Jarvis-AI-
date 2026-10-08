@@ -184,29 +184,30 @@ header p {
 /* Control Input Area */
 .control-bar {
   display: flex;
-  gap: 8px;
+  gap: 6px;
   height: 44px;
 }
 
-input {
+input[type="text"] {
   flex: 1;
   background: #000000;
   border: 1px solid rgba(0, 229, 255, 0.5);
   color: #00e5ff;
-  padding: 0 12px;
+  padding: 0 10px;
   font-family: 'Rajdhani', sans-serif;
-  font-size: 15px;
+  font-size: 14px;
   letter-spacing: 1px;
   border-radius: 2px;
   outline: none;
+  min-width: 0;
 }
 
-input:focus {
+input[type="text"]:focus {
   border-color: #00e5ff;
   box-shadow: 0 0 8px rgba(0, 229, 255, 0.5);
 }
 
-input::placeholder {
+input[type="text"]::placeholder {
   color: rgba(0, 229, 255, 0.4);
 }
 
@@ -218,22 +219,28 @@ button {
   font-size: 12px;
   font-weight: 800;
   letter-spacing: 1px;
-  padding: 0 16px;
+  padding: 0 12px;
   border-radius: 2px;
   cursor: pointer;
   display: flex;
   align-items: center;
   justify-content: center;
+  flex-shrink: 0;
 }
 
 button:active {
   background: #00b8cc;
 }
 
-#mic {
+#mic, #cam-btn, #clear-btn {
   background: transparent;
   border: 1px solid rgba(0, 229, 255, 0.5);
   color: #00e5ff;
-  font-size: 16px;
-  padding: 0 14px;
+  font-size: 15px;
+  padding: 0 10px;
+}
+
+#clear-btn:active {
+  background: rgba(255, 0, 85, 0.3);
+  border-color: #ff0055;
 }

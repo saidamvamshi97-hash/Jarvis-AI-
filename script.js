@@ -6,21 +6,11 @@ const micBtn = document.getElementById("mic");
 const arcCore = document.getElementById("arc-core");
 const batteryRow = document.getElementById("battery-row");
 
-// --- Model Configuration with Fallbacks ---
-// If gemini-flash-latest hits temporary load limits, fallback triggers
-const MODEL_TIERS = ["gemini-flash-latest", "gemini-2.5-flash", "gemini-2.0-flash"];
+// Active models to try in order
+const MODELS = ["gemini-1.5-flash", "gemini-2.0-flash"];
 
-// --- State and Memory ---
-let conversationHistory = [
-  {
-    role: "user",
-    parts: [{ text: "You are J.A.R.V.I.S, Tony Stark's AI console. Address the user as Boss. Respond sharply in 1 or 2 concise sentences." }]
-  },
-  {
-    role: "model",
-    parts: [{ text: "Systems online and fully operational, Boss." }]
-  }
-];
+// Chat history buffer
+let conversationHistory = [];
 
 function setReactor(state) {
   if (!arcCore) return;
@@ -54,7 +44,7 @@ function speak(text) {
   const clean = text.replace(/[*#_`~]/g, "").trim();
   const u = new SpeechSynthesisUtterance(clean);
   u.lang = "en-US";
-  u.rate = 1.05;
+  u.rate = 1.0;
   u.pitch = 0.95;
 
   const voices = window.speechSynthesis.getVoices();
@@ -68,14 +58,14 @@ function speak(text) {
   window.speechSynthesis.speak(u);
 }
 
-// Unlock audio on mobile interaction
+// Unlock audio on mobile touch
 window.addEventListener("touchstart", () => {
   if ("speechSynthesis" in window) {
     window.speechSynthesis.speak(new SpeechSynthesisUtterance(""));
   }
 }, { once: true });
 
-// Battery Telemetry
+// Battery Diagnostics
 async function getBatteryStatus() {
   if (navigator.getBattery && batteryRow) {
     try {
@@ -107,70 +97,115 @@ function getApiKey() {
   return key.trim();
 }
 
-// AI Core Engine with Model Failover
+// Instant Local Handlers
+function checkLocalCommand(cmd) {
+  const clean = cmd.toLowerCase().trim();
+
+  // Instant local time
+  if (clean.includes("time") || clean.includes("time now")) {
+    const timeStr = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+    return `The current time is ${timeStr}, Boss.`;
+  }
+
+  // Instant local date
+  if (clean.includes("date today") || clean === "what is today" || clean === "date") {
+    const dateStr = new Date().toLocaleDateString(undefined, { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
+    return `Today is ${dateStr}, Boss.`;
+  }
+
+  // Music shortcut
+  if (clean.includes("play music") || clean.includes("play song")) {
+    setTimeout(() => window.open("https://music.youtube.com", "_blank"), 1000);
+    return "Launching YouTube Music now, Boss.";
+  }
+
+  return null;
+}
+
+// Main Query Function
 async function askJarvis(promptText) {
+  add(`<span class="prefix">YOU:</span> ${promptText}`, "user");
+  if (input) input.value = "";
+
+  // 1. Check local fast-path commands first
+  const localReply = checkLocalCommand(promptText);
+  if (localReply) {
+    add(`<span class="prefix">J.A.R.V.I.S:</span> ${localReply}`, 'ai');
+    speak(localReply);
+    return;
+  }
+
   const key = getApiKey();
   if (!key) {
     add('<span class="prefix">J.A.R.V.I.S:</span> API Key required to initialize protocols.', 'ai');
     return;
   }
 
-  add(`<span class="prefix">YOU:</span> ${promptText}`, "user");
-  if (input) input.value = "";
   add('<span class="prefix">J.A.R.V.I.S:</span> Processing...', 'ai');
   setReactor("thinking");
 
+  // Keep a clean rolling context of last 6 exchanges
   conversationHistory.push({ role: "user", parts: [{ text: promptText }] });
+  if (conversationHistory.length > 6) {
+    conversationHistory = conversationHistory.slice(-6);
+  }
 
-  let success = false;
-  let reply = "";
+  let finalReply = null;
+  let lastErrorMsg = "";
 
-  for (let model of MODEL_TIERS) {
+  for (let model of MODELS) {
     try {
       const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${key}`;
       const res = await fetch(url, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ contents: conversationHistory })
+        body: JSON.stringify({
+          system_instruction: {
+            parts: [{ text: "You are J.A.R.V.I.S, Tony Stark's AI assistant. Always address the user as Boss. Respond sharply and concisely in 1 to 2 sentences." }]
+          },
+          contents: conversationHistory
+        })
       });
 
       const data = await res.json();
 
       if (data.error) {
-        if (data.error.code === 400 || data.error.status === "INVALID_ARGUMENT") {
+        lastErrorMsg = data.error.message || `Error ${data.error.code}`;
+        // If API key is rejected
+        if (data.error.code === 400 && data.error.message?.includes("API_KEY_INVALID")) {
           localStorage.removeItem("GEMINI_API_KEY");
-          chat.lastChild.innerHTML = `<span class="prefix">J.A.R.V.I.S:</span> Key invalid. Resetting storage.`;
+          chat.lastChild.innerHTML = `<span class="prefix">J.A.R.V.I.S:</span> Key invalid. Resetting stored key.`;
+          speak("Invalid API key, Boss.");
           setReactor("idle");
           return;
         }
-        // If high-demand or rate limit, continue to the next model in tier
-        continue;
+        continue; // Try next model
       }
 
-      reply = data.candidates?.[0]?.content?.parts?.[0]?.text;
-      if (reply) {
-        success = true;
+      const text = data.candidates?.[0]?.content?.parts?.[0]?.text;
+      if (text) {
+        finalReply = text;
         break;
       }
-    } catch (e) {
-      continue;
+    } catch (err) {
+      lastErrorMsg = err.message;
     }
   }
 
-  if (success && reply) {
-    chat.lastChild.innerHTML = `<span class="prefix">J.A.R.V.I.S:</span> ${reply}`;
-    conversationHistory.push({ role: "model", parts: [{ text: reply }] });
-    speak(reply);
+  if (finalReply) {
+    chat.lastChild.innerHTML = `<span class="prefix">J.A.R.V.I.S:</span> ${finalReply}`;
+    conversationHistory.push({ role: "model", parts: [{ text: finalReply }] });
+    speak(finalReply);
   } else {
-    chat.lastChild.innerHTML = `<span class="prefix">J.A.R.V.I.S:</span> System busy across all network tiers. Try again shortly.`;
-    speak("High demand on network, Boss.");
+    chat.lastChild.innerHTML = `<span class="prefix">J.A.R.V.I.S:</span> ${lastErrorMsg || "Connection failed. Please retry."}`;
+    speak("System error encountered, Boss.");
     conversationHistory.pop();
   }
 
   setReactor("idle");
 }
 
-// Action triggers
+// Action listeners
 if (sendBtn) {
   sendBtn.addEventListener("click", () => {
     const val = input ? input.value.trim() : "";
@@ -187,7 +222,7 @@ if (input) {
   });
 }
 
-// Speech Recognition Trigger
+// Voice Recognition
 const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
 if (SpeechRecognition && micBtn) {
   const rec = new SpeechRecognition();

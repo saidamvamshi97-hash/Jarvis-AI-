@@ -56,7 +56,7 @@ async function askGemini(promptText) {
   add("J.A.R.V.I.S: Processing...", "ai");
 
   try {
-    const url = `const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.8-flash:generateContent?key=${currentKey}`;`;
+    const url =  `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.8-flash:generateContent?key=${currentKey}`;
     const response = await fetch(url, {
       method: "POST",
       headers: { "Content-Type": "application/json" },

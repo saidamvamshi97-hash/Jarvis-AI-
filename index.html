@@ -36,13 +36,19 @@
     </div>
 
     <div class="terminal-chat" id="chat">
-      <div class="msg ai"><span class="prefix">J.A.R.V.I.S:</span> Systems operational. How may I assist you, Boss?</div>
+      <div class="msg ai"><span class="prefix">J.A.R.V.I.S:</span> Systems operational. Memory and Vision online. Ready, Boss.</div>
     </div>
 
     <div class="control-bar">
       <input type="text" id="msg" placeholder="Enter command..." autocomplete="off">
+      
+      <!-- Hidden Camera File Input & Trigger -->
+      <input type="file" id="camera-input" accept="image/*" capture="environment" style="display: none;">
+      <button id="cam-btn" title="Vision Scan">📸</button>
+
       <button id="mic" title="Voice Command">🎤</button>
       <button id="send">SEND</button>
+      <button id="clear-btn" title="Clear Memory">🗑️</button>
     </div>
   </div>
 

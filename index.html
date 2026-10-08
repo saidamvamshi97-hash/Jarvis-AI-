@@ -2,67 +2,55 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <title>J.A.R.V.I.S - Mobile Edition</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>J.A.R.V.I.S</title>
+
+  <!-- PWA Settings -->
+  <link rel="manifest" href="manifest.json">
+  <meta name="theme-color" content="#00ffff">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
-  <div class="hud-container">
-    <!-- Header -->
-    <header>
-      <h1>J.A.R.V.I.S</h1>
-      <p class="subtitle">MOBILE EDITION</p>
-    </header>
+  <header>
+    <h1>J.A.R.V.I.S</h1>
+    <p>SYSTEM ONLINE</p>
+  </header>
 
-    <!-- Arc Reactor Core HUD -->
-    <div class="core-wrapper">
-      <div class="reactor" id="reactor-core">
-        <div class="ring outer-ring"></div>
-        <div class="ring mid-ring"></div>
-        <div class="ring inner-ring"></div>
-        <div class="center-glow"></div>
-      </div>
-      <div class="core-status" id="core-state-text">CORE ACTIVE</div>
-    </div>
+  <div class="core">
+    <div class="ring r1"></div>
+    <div class="ring r2"></div>
+    <div class="center"></div>
+  </div>
+  <div class="core-text">ARC REACTOR ACTIVE</div>
 
-    <!-- System Status Panel -->
-    <div class="hud-box status-panel">
-      <div class="panel-header">SYSTEM STATUS</div>
-      <div class="status-grid">
-        <div class="status-row">
-          <span class="label">AI CORE</span>
-          <span class="badge online" id="core-status">● ONLINE</span>
-        </div>
-        <div class="status-row">
-          <span class="label">NETWORK</span>
-          <span class="badge online" id="net-status">● ONLINE</span>
-        </div>
-        <div class="status-row">
-          <span class="label">VOICE</span>
-          <span class="badge online" id="voice-status">● ONLINE</span>
-        </div>
-        <div class="status-row">
-          <span class="label">MEMORY</span>
-          <span class="badge online" id="memory-status">● ONLINE</span>
-        </div>
-      </div>
-    </div>
+  <div class="status">
+    <h2>SYSTEM DIAGNOSTICS</h2>
+    <div class="row"><span>CORE TEMP</span><span class="on">NORMAL</span></div>
+    <div class="row"><span>NETWORK</span><span class="on">SECURE</span></div>
+  </div>
 
-    <!-- Chat Console Output -->
-    <div class="hud-box chat-console" id="chat">
-      <div class="msg ai">
-        <strong>J.A.R.V.I.S:</strong> Systems operational. Core telemetry synchronized. How may I assist you, Boss?
-      </div>
-    </div>
+  <div class="chat" id="chat">
+    <div class="msg ai">J.A.R.V.I.S: Systems operational. How may I assist you, Boss?</div>
+  </div>
 
-    <!-- Input Bar -->
-    <div class="input-panel">
-      <input type="text" id="msg" placeholder="Ask JARVIS..." autocomplete="off">
-      <button id="mic" title="Voice Input" aria-label="Microphone">🎤</button>
-      <button id="send">SEND</button>
-    </div>
+  <div class="input-area">
+    <input type="text" id="msg" placeholder="Enter command..." autocomplete="off">
+    <button id="mic" title="Voice Command">🎤</button>
+    <button id="send">SEND</button>
   </div>
 
   <script src="script.js"></script>
+  <script>
+    if ("serviceWorker" in navigator) {
+      window.addEventListener("load", () => {
+        navigator.serviceWorker.register("./sw.js")
+          .then(() => console.log("J.A.R.V.I.S Service Worker Active"))
+          .catch((err) => console.warn("SW Error:", err));
+      });
+    }
+  </script>
 </body>
 </html>

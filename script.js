@@ -13,7 +13,48 @@ const batteryRow = document.getElementById("battery-row");
 // --- 2. State & Memory ---
 let conversationHistory = [];
 
-// --- 3. Reactive Arc Reactor HUD State ---
+// --- 3. Hardware Haptics & Torch Engine ---
+let cameraStream = null;
+let torchTrack = null;
+
+const HAPTICS = {
+  tap: () => { if (navigator.vibrate) navigator.vibrate(25); },
+  confirm: () => { if (navigator.vibrate) navigator.vibrate([40, 50, 60]); },
+  error: () => { if (navigator.vibrate) navigator.vibrate([80, 40, 80]); }
+};
+
+async function toggleTorch(turnOn) {
+  try {
+    if (turnOn) {
+      if (!cameraStream) {
+        cameraStream = await navigator.mediaDevices.getUserMedia({
+          video: { facingMode: "environment" }
+        });
+      }
+      torchTrack = cameraStream.getVideoTracks()[0];
+      const capabilities = torchTrack.getCapabilities ? torchTrack.getCapabilities() : {};
+      if (capabilities.torch) {
+        await torchTrack.applyConstraints({ advanced: [{ torch: true }] });
+        return true;
+      } else {
+        return false;
+      }
+    } else {
+      if (torchTrack) {
+        await torchTrack.applyConstraints({ advanced: [{ torch: false }] });
+        torchTrack.stop();
+        cameraStream = null;
+        torchTrack = null;
+      }
+      return true;
+    }
+  } catch (err) {
+    console.warn("Torch hardware restricted or unsupported:", err);
+    return false;
+  }
+}
+
+// --- 4. Reactive Arc Reactor HUD State ---
 function setReactor(state) {
   if (!arcCore) return;
   const centerRing = arcCore.querySelector(".center");
@@ -34,7 +75,7 @@ function setReactor(state) {
   }
 }
 
-// --- 4. Chat Message Appender ---
+// --- 5. Chat Message Appender ---
 function add(text, who) {
   if (!chat) return;
   const d = document.createElement("div");
@@ -44,12 +85,11 @@ function add(text, who) {
   chat.scrollTop = chat.scrollHeight;
 }
 
-// --- 5. Mobile-Optimized Speech Engine ---
+// --- 6. Mobile-Optimized Speech Engine ---
 function speak(text) {
   if (!("speechSynthesis" in window)) return;
   window.speechSynthesis.cancel();
 
-  // Strip markdown formatting (*, #, _, `, ~) for smooth vocal synthesis
   const clean = text.replace(/[*#_`~]/g, "").trim();
   const utterance = new SpeechSynthesisUtterance(clean);
   utterance.lang = "en-US";
@@ -67,14 +107,14 @@ function speak(text) {
   window.speechSynthesis.speak(utterance);
 }
 
-// Pre-unlock speech synthesizer on initial mobile touch
+// Unlock audio on initial mobile touch
 window.addEventListener("touchstart", () => {
   if ("speechSynthesis" in window) {
     window.speechSynthesis.speak(new SpeechSynthesisUtterance(""));
   }
 }, { once: true });
 
-// --- 6. Hardware Diagnostics (Battery Monitor) ---
+// --- 7. Hardware Diagnostics (Battery Monitor) ---
 async function getBatteryStatus() {
   if (navigator.getBattery && batteryRow) {
     try {
@@ -94,7 +134,7 @@ async function getBatteryStatus() {
 }
 getBatteryStatus();
 
-// --- 7. API Key Manager ---
+// --- 8. API Key Manager ---
 function getApiKey() {
   let key = localStorage.getItem("GEMINI_API_KEY");
   if (!key || key.trim() === "") {
@@ -108,36 +148,56 @@ function getApiKey() {
   return key.trim();
 }
 
-// --- 8. Instant Local Hardware & Command Router ---
+// --- 9. Instant Local Hardware & Command Router ---
 function checkLocalCommand(cmd) {
   const clean = cmd.toLowerCase().trim();
 
   // Instant local time
   if (clean.includes("time") || clean.includes("time now")) {
+    HAPTICS.tap();
     const timeStr = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
     return `The current time is ${timeStr}, Boss.`;
   }
 
   // Instant local date
   if (clean.includes("date today") || clean === "what is today" || clean === "date") {
+    HAPTICS.tap();
     const dateStr = new Date().toLocaleDateString(undefined, { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
     return `Today is ${dateStr}, Boss.`;
   }
 
-  // Media trigger
+  // Flashlight / Torch Controls
+  if (clean.includes("torch on") || clean.includes("flashlight on") || clean.includes("lights on")) {
+    HAPTICS.confirm();
+    toggleTorch(true).then((ok) => {
+      const msg = ok ? "Illumination active, Boss." : "Torch hardware unavailable on this browser.";
+      add(`<span class="prefix">J.A.R.V.I.S:</span> ${msg}`, 'ai');
+      speak(msg);
+    });
+    return "Engaging illumination protocols...";
+  }
+
+  if (clean.includes("torch off") || clean.includes("flashlight off") || clean.includes("lights off")) {
+    HAPTICS.confirm();
+    toggleTorch(false);
+    return "Illumination deactivated, Boss.";
+  }
+
+  // Media shortcuts
   if (clean.includes("play music") || clean.includes("play song") || clean.includes("play some music")) {
+    HAPTICS.confirm();
     setTimeout(() => window.open("https://music.youtube.com", "_blank"), 1000);
     return "Launching YouTube Music now, Boss.";
   }
 
-  // YouTube trigger
   if (clean.startsWith("open youtube")) {
+    HAPTICS.confirm();
     setTimeout(() => window.open("https://www.youtube.com", "_blank"), 1000);
     return "Opening YouTube, Boss.";
   }
 
-  // Google Maps trigger
   if (clean.includes("navigate to") || clean.includes("where is")) {
+    HAPTICS.confirm();
     const query = clean.replace(/navigate to|where is/gi, "").trim();
     if (query) {
       setTimeout(() => window.open(`https://www.google.com/maps/search/${encodeURIComponent(query)}`, "_blank"), 1000);
@@ -148,12 +208,13 @@ function checkLocalCommand(cmd) {
   return null;
 }
 
-// --- 9. Autonomous Multi-Tier AI Uplink ---
+// --- 10. Autonomous Multi-Tier AI Uplink ---
 async function askJarvis(promptText) {
+  HAPTICS.tap();
   add(`<span class="prefix">YOU:</span> ${promptText}`, "user");
   if (input) input.value = "";
 
-  // 1. Check local shortcuts first
+  // Check local fast-path commands first
   const localReply = checkLocalCommand(promptText);
   if (localReply) {
     add(`<span class="prefix">J.A.R.V.I.S:</span> ${localReply}`, 'ai');
@@ -164,7 +225,6 @@ async function askJarvis(promptText) {
   add('<span class="prefix">J.A.R.V.I.S:</span> Processing...', 'ai');
   setReactor("thinking");
 
-  // Keep a clean rolling context of the last 6 exchanges
   conversationHistory.push({ role: "user", parts: [{ text: promptText }] });
   if (conversationHistory.length > 6) {
     conversationHistory = conversationHistory.slice(-6);
@@ -174,7 +234,7 @@ async function askJarvis(promptText) {
   let lastErrorMsg = "";
   const key = getApiKey();
 
-  // --- Tier 1: Primary Gemini Uplink ---
+  // Tier 1: Gemini Uplink
   if (key) {
     const modelsToTry = ["gemini-1.5-flash", "gemini-2.0-flash", "gemini-flash-latest"];
     for (const model of modelsToTry) {
@@ -200,7 +260,7 @@ async function askJarvis(promptText) {
             lastErrorMsg = "Stored API key is invalid. Cleared from storage.";
             break;
           }
-          continue; // Try next model tier
+          continue;
         }
 
         const candidate = data.candidates?.[0]?.content?.parts?.[0]?.text;
@@ -214,11 +274,9 @@ async function askJarvis(promptText) {
     }
   }
 
-  // --- Tier 2: Keyless Satellite Fallback (Pollinations AI) ---
-  // Triggers automatically if Gemini quota is exhausted (429), key is missing, or servers fail
+  // Tier 2: Free Public AI Satellite Backup (No key required)
   if (!finalReply) {
     try {
-      console.warn("Primary Gemini node failed or unavailable. Switching to secondary satellite uplink...");
       const systemContext = encodeURIComponent("You are J.A.R.V.I.S, Tony Stark's AI assistant. Always address the user as Boss. Respond sharply and concisely in 1 to 2 sentences.");
       const userPrompt = encodeURIComponent(promptText);
       const fallbackUrl = `https://text.pollinations.ai/${userPrompt}?system=${systemContext}`;
@@ -231,17 +289,18 @@ async function askJarvis(promptText) {
         }
       }
     } catch (err) {
-      console.error("Backup uplink failed:", err);
+      console.error("Backup satellite uplink failed:", err);
       if (!lastErrorMsg) lastErrorMsg = err.message;
     }
   }
 
-  // Render & Speak Response
   if (finalReply) {
+    HAPTICS.confirm();
     chat.lastChild.innerHTML = `<span class="prefix">J.A.R.V.I.S:</span> ${finalReply}`;
     conversationHistory.push({ role: "model", parts: [{ text: finalReply }] });
     speak(finalReply);
   } else {
+    HAPTICS.error();
     chat.lastChild.innerHTML = `<span class="prefix">J.A.R.V.I.S:</span> Uplink offline: ${lastErrorMsg || "Network unreachable."}`;
     speak("Uplink disrupted, Boss.");
     conversationHistory.pop();
@@ -250,7 +309,7 @@ async function askJarvis(promptText) {
   setReactor("idle");
 }
 
-// --- 10. Event Handlers ---
+// --- 11. Event Handlers ---
 if (sendBtn) {
   sendBtn.addEventListener("click", () => {
     const val = input ? input.value.trim() : "";
@@ -267,7 +326,7 @@ if (input) {
   });
 }
 
-// --- 11. Speech Recognition Interface ---
+// --- 12. Speech Recognition Interface ---
 const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
 if (SpeechRecognition && micBtn) {
   const rec = new SpeechRecognition();
@@ -276,6 +335,7 @@ if (SpeechRecognition && micBtn) {
 
   micBtn.addEventListener("click", () => {
     try {
+      HAPTICS.tap();
       setReactor("listening");
       micBtn.innerText = "🔴";
       rec.start();

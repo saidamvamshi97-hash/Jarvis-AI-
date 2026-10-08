@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
   <title>J.A.R.V.I.S - Mobile Edition</title>
   <link rel="stylesheet" href="style.css">
 </head>
@@ -14,15 +14,15 @@
       <p class="subtitle">MOBILE EDITION</p>
     </header>
 
-    <!-- Arc Reactor -->
+    <!-- Arc Reactor Core HUD -->
     <div class="core-wrapper">
-      <div class="reactor">
+      <div class="reactor" id="reactor-core">
         <div class="ring outer-ring"></div>
         <div class="ring mid-ring"></div>
         <div class="ring inner-ring"></div>
         <div class="center-glow"></div>
       </div>
-      <div class="core-status">CORE ACTIVE</div>
+      <div class="core-status" id="core-state-text">CORE ACTIVE</div>
     </div>
 
     <!-- System Status Panel -->
@@ -31,11 +31,11 @@
       <div class="status-grid">
         <div class="status-row">
           <span class="label">AI CORE</span>
-          <span class="badge online">● ONLINE</span>
+          <span class="badge online" id="core-status">● ONLINE</span>
         </div>
         <div class="status-row">
           <span class="label">NETWORK</span>
-          <span class="badge online">● ONLINE</span>
+          <span class="badge online" id="net-status">● ONLINE</span>
         </div>
         <div class="status-row">
           <span class="label">VOICE</span>
@@ -48,17 +48,17 @@
       </div>
     </div>
 
-    <!-- Chat / Output Console -->
+    <!-- Chat Console Output -->
     <div class="hud-box chat-console" id="chat">
       <div class="msg ai">
-        <strong>J.A.R.V.I.S:</strong> Systems operational. How may I assist you, Boss?
+        <strong>J.A.R.V.I.S:</strong> Systems operational. Core telemetry synchronized. How may I assist you, Boss?
       </div>
     </div>
 
-    <!-- Controls -->
+    <!-- Input Bar -->
     <div class="input-panel">
       <input type="text" id="msg" placeholder="Ask JARVIS..." autocomplete="off">
-      <button id="mic" title="Voice Input">🎤</button>
+      <button id="mic" title="Voice Input" aria-label="Microphone">🎤</button>
       <button id="send">SEND</button>
     </div>
   </div>

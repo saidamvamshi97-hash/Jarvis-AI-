@@ -108,17 +108,17 @@ function speak(text) {
     setReactorState("speaking");
   };
   utterance.onend = () => {
-    setReactorState("idle");
+    setReactorState(isContinuousListening ? "listening" : "idle");
   };
   utterance.onerror = (e) => {
     console.error("SpeechSynthesis error:", e);
-    setReactorState("idle");
+    setReactorState(isContinuousListening ? "listening" : "idle");
   };
 
   window.speechSynthesis.speak(utterance);
 }
 
-// Pre-load voices and unlock browser audio on the first screen tap
+// Pre-load voices and unlock browser audio on user interaction
 if ("speechSynthesis" in window) {
   window.speechSynthesis.onvoiceschanged = () => {
     window.speechSynthesis.getVoices();
@@ -126,7 +126,6 @@ if ("speechSynthesis" in window) {
 
   const unlockAudioEngine = () => {
     initAudio();
-    // Warm up the mobile speech synthesizer
     window.speechSynthesis.speak(new SpeechSynthesisUtterance(""));
     window.removeEventListener("touchstart", unlockAudioEngine);
     window.removeEventListener("click", unlockAudioEngine);
@@ -293,7 +292,7 @@ async function askGemini(promptText) {
       UI_AUDIO.error();
       speak("System error encountered, Boss.");
       conversationHistory.pop();
-      setReactorState("idle");
+      setReactorState(isContinuousListening ? "listening" : "idle");
 
       if (data.error.code === 400 || data.error.status === "INVALID_ARGUMENT") {
         localStorage.removeItem("GEMINI_API_KEY");
@@ -317,7 +316,7 @@ async function askGemini(promptText) {
     UI_AUDIO.error();
     speak("Uplink disrupted, Boss.");
     conversationHistory.pop();
-    setReactorState("idle");
+    setReactorState(isContinuousListening ? "listening" : "idle");
   }
 }
 
@@ -340,42 +339,94 @@ if (input) {
   });
 }
 
-// --- 12. Voice Recognition Protocol ---
-if (micBtn) {
-  const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-  if (SpeechRecognition) {
-    const recognition = new SpeechRecognition();
-    recognition.lang = "en-US";
-    recognition.interimResults = false;
+// --- 12. Continuous Wake-Word & Voice Recognition Protocol ---
+let isContinuousListening = false;
+let recognition = null;
 
-    micBtn.addEventListener("click", () => {
+const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+
+if (SpeechRecognition && micBtn) {
+  recognition = new SpeechRecognition();
+  recognition.lang = "en-US";
+  recognition.continuous = true;
+  recognition.interimResults = false;
+
+  function startListeningLoop() {
+    try {
+      isContinuousListening = true;
+      micBtn.innerText = "⚡";
+      micBtn.style.background = "rgba(0, 255, 255, 0.4)";
+      micBtn.title = "Wake Word Active ('Hey Jarvis')";
+      UI_AUDIO.listening();
+      setReactorState("listening");
+      recognition.start();
+      add("SYSTEM: Hands-free wake-word active. Say 'Hey Jarvis...'", "ai");
+    } catch (e) {
+      console.warn("Recognition start error:", e);
+    }
+  }
+
+  function stopListeningLoop() {
+    isContinuousListening = false;
+    micBtn.innerText = "🎤";
+    micBtn.style.background = "";
+    micBtn.title = "Voice Command";
+    setReactorState("idle");
+    try {
+      recognition.stop();
+    } catch (e) {}
+  }
+
+  micBtn.addEventListener("click", () => {
+    if (!isContinuousListening) {
+      startListeningLoop();
+    } else {
+      stopListeningLoop();
+    }
+  });
+
+  recognition.onresult = (event) => {
+    const lastResultIndex = event.results.length - 1;
+    const rawTranscript = event.results[lastResultIndex][0].transcript.trim();
+    const cleanLower = rawTranscript.toLowerCase();
+
+    if (cleanLower.includes("jarvis") || cleanLower.includes("hey jarvis")) {
+      const command = rawTranscript.replace(/hey jarvis|jarvis/gi, "").trim();
+      UI_AUDIO.click();
+
+      if (command.length > 0) {
+        if (input) input.value = command;
+        askGemini(command);
+      } else {
+        speak("Online and listening, Boss.");
+      }
+    }
+  };
+
+  recognition.onend = () => {
+    if (isContinuousListening) {
       try {
-        UI_AUDIO.listening();
-        setReactorState("listening");
-        micBtn.innerText = "🔴";
         recognition.start();
       } catch (e) {
-        recognition.stop();
-        setReactorState("idle");
-        micBtn.innerText = "🎤";
+        setTimeout(() => {
+          if (isContinuousListening) recognition.start();
+        }, 500);
       }
-    });
-
-    recognition.onresult = (event) => {
-      const transcript = event.results[0][0].transcript;
-      if (input) input.value = transcript;
-      askGemini(transcript);
-    };
-
-    recognition.onend = () => {
-      micBtn.innerText = "🎤";
-    };
-
-    recognition.onerror = () => {
+    } else {
       micBtn.innerText = "🎤";
       setReactorState("idle");
-    };
-  } else {
-    micBtn.style.display = "none";
-  }
+    }
+  };
+
+  recognition.onerror = (e) => {
+    if (e.error !== "no-speech") {
+      console.warn("Speech error:", e.error);
+    }
+    if (!isContinuousListening) {
+      micBtn.innerText = "🎤";
+      setReactorState("idle");
+    }
+  };
+} else if (micBtn) {
+  micBtn.style.display = "none";
 }

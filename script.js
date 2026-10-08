@@ -177,8 +177,11 @@ if ("speechSynthesis" in window) {
   window.addEventListener("click", unlockAudioEngine, { once: true });
 }
 
-// --- 7. Hardware Telemetry & Real-Time Battery Monitor ---
+// --- 7. Hardware & Environmental Telemetry ---
+let currentWeatherReport = "Weather telemetry unavailable at this time, Boss.";
+
 async function initTelemetry() {
+  // Device Battery Monitor
   if (navigator.getBattery && statusPanel) {
     try {
       const battery = await navigator.getBattery();
@@ -201,6 +204,37 @@ async function initTelemetry() {
     } catch (e) {
       console.warn("Battery telemetry unavailable:", e);
     }
+  }
+
+  // Live Weather Telemetry via Geolocation
+  if (navigator.geolocation && statusPanel) {
+    navigator.geolocation.getCurrentPosition(async (pos) => {
+      try {
+        const lat = pos.coords.latitude;
+        const lon = pos.coords.longitude;
+        const res = await fetch(`https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current_weather=true`);
+        const data = await res.json();
+
+        if (data && data.current_weather) {
+          const temp = Math.round(data.current_weather.temperature);
+          const wind = data.current_weather.windspeed;
+          currentWeatherReport = `Current temperature is ${temp}°C with wind speeds of ${wind} kilometers per hour.`;
+
+          let weatherRow = document.getElementById("diag-weather");
+          if (!weatherRow) {
+            weatherRow = document.createElement("div");
+            weatherRow.id = "diag-weather";
+            weatherRow.className = "row";
+            statusPanel.appendChild(weatherRow);
+          }
+          weatherRow.innerHTML = `<span>LOCAL ATMO</span><span class="on">${temp}°C [${wind} KM/H]</span>`;
+        }
+      } catch (err) {
+        console.warn("Weather fetch failed:", err);
+      }
+    }, (err) => {
+      console.warn("Geolocation bypassed:", err.message);
+    });
   }
 }
 initTelemetry();
@@ -244,14 +278,25 @@ function add(text, who) {
 function executeAutonomousAction(command) {
   const text = command.toLowerCase().trim();
 
+  // Local Weather Briefing
+  if (text.includes("weather") || text.includes("temperature") || text.includes("atmospheric conditions")) {
+    setTimeout(() => {
+      speak(currentWeatherReport);
+      add("J.A.R.V.I.S: " + currentWeatherReport, "ai");
+    }, 600);
+    return true;
+  }
+  // Play Music Action
   if (text.includes("play music") || text.includes("play song") || text.includes("play some music")) {
     setTimeout(() => window.open("https://music.youtube.com", "_blank"), 1200);
     return true;
   }
+  // Open YouTube
   if (text.startsWith("open youtube")) {
     setTimeout(() => window.open("https://www.youtube.com", "_blank"), 1200);
     return true;
   }
+  // Maps & Location
   if (text.includes("navigate to") || text.includes("where is")) {
     const query = text.replace(/navigate to|where is/gi, "").trim();
     if (query) {
@@ -259,6 +304,7 @@ function executeAutonomousAction(command) {
       return true;
     }
   }
+  // Google Search
   if (text.startsWith("google ") || text.startsWith("search for ")) {
     const query = text.replace(/google |search for /gi, "").trim();
     if (query) {
@@ -266,6 +312,7 @@ function executeAutonomousAction(command) {
       return true;
     }
   }
+  // Wikipedia Dossier
   if (text.startsWith("lookup ") || text.startsWith("who is ")) {
     const query = text.replace(/lookup |who is /gi, "").trim();
     if (query) {

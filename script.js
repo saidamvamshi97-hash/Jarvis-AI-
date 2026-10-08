@@ -107,7 +107,7 @@ function speak(text) {
   window.speechSynthesis.speak(utterance);
 }
 
-// Unlock audio on initial mobile touch
+// Pre-unlock speech synthesizer on touch
 window.addEventListener("touchstart", () => {
   if ("speechSynthesis" in window) {
     window.speechSynthesis.speak(new SpeechSynthesisUtterance(""));
@@ -136,16 +136,7 @@ getBatteryStatus();
 
 // --- 8. API Key Manager ---
 function getApiKey() {
-  let key = localStorage.getItem("GEMINI_API_KEY");
-  if (!key || key.trim() === "") {
-    key = prompt("Enter your Google Gemini API Key (or leave blank to use the public backup satellite):");
-    if (key && key.trim() !== "") {
-      localStorage.setItem("GEMINI_API_KEY", key.trim());
-      return key.trim();
-    }
-    return null;
-  }
-  return key.trim();
+  return localStorage.getItem("GEMINI_API_KEY") || null;
 }
 
 // --- 9. Instant Local Hardware & Command Router ---
@@ -208,7 +199,7 @@ function checkLocalCommand(cmd) {
   return null;
 }
 
-// --- 10. Autonomous Multi-Tier AI Uplink ---
+// --- 10. Autonomous AI Uplink with Automatic Quota Failover ---
 async function askJarvis(promptText) {
   HAPTICS.tap();
   add(`<span class="prefix">YOU:</span> ${promptText}`, "user");
@@ -231,69 +222,53 @@ async function askJarvis(promptText) {
   }
 
   let finalReply = null;
-  let lastErrorMsg = "";
   const key = getApiKey();
 
-  // Tier 1: Gemini Uplink
+  // Tier 1: Primary Gemini Attempt (if key exists)
   if (key) {
-    const modelsToTry = ["gemini-1.5-flash", "gemini-2.0-flash", "gemini-flash-latest"];
-    for (const model of modelsToTry) {
-      try {
-        const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${key}`;
-        const res = await fetch(url, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            system_instruction: {
-              parts: [{ text: "You are J.A.R.V.I.S, Tony Stark's futuristic AI assistant. Always address the user as Boss. Respond sharply, confidently, and concisely in 1 to 2 sentences." }]
-            },
-            contents: conversationHistory
-          })
-        });
+    try {
+      const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${key}`;
+      const res = await fetch(url, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          contents: [{ role: "user", parts: [{ text: "You are J.A.R.V.I.S. Respond sharply to Boss in 1-2 short sentences: " + promptText }] }]
+        })
+      });
 
-        const data = await res.json();
+      const data = await res.json();
 
-        if (data.error) {
-          lastErrorMsg = data.error.message || `Error ${data.error.code}`;
-          if (data.error.code === 400 && data.error.message?.includes("API_KEY_INVALID")) {
-            localStorage.removeItem("GEMINI_API_KEY");
-            lastErrorMsg = "Stored API key is invalid. Cleared from storage.";
-            break;
-          }
-          continue;
-        }
-
-        const candidate = data.candidates?.[0]?.content?.parts?.[0]?.text;
-        if (candidate) {
-          finalReply = candidate;
-          break;
-        }
-      } catch (err) {
-        lastErrorMsg = err.message;
+      // If Google succeeds without errors or quota lockouts
+      if (!data.error && data.candidates?.[0]?.content?.parts?.[0]?.text) {
+        finalReply = data.candidates[0].content.parts[0].text;
+      } else {
+        console.warn("Gemini quota or error encountered. Instantly routing to backup satellite...");
       }
+    } catch (err) {
+      console.warn("Gemini request failed. Routing to backup satellite...");
     }
   }
 
-  // Tier 2: Free Public AI Satellite Backup (No key required)
+  // Tier 2: Free AI Satellite (Unlimited, no API key needed, never locks out)
   if (!finalReply) {
     try {
-      const systemContext = encodeURIComponent("You are J.A.R.V.I.S, Tony Stark's AI assistant. Always address the user as Boss. Respond sharply and concisely in 1 to 2 sentences.");
-      const userPrompt = encodeURIComponent(promptText);
-      const fallbackUrl = `https://text.pollinations.ai/${userPrompt}?system=${systemContext}`;
+      const sysInstruction = encodeURIComponent("You are J.A.R.V.I.S, Tony Stark's AI assistant. Always address the user as Boss. Respond sharply and concisely in 1 or 2 sentences.");
+      const promptClean = encodeURIComponent(promptText);
+      const satelliteUrl = `https://text.pollinations.ai/${promptClean}?system=${sysInstruction}`;
 
-      const backupRes = await fetch(fallbackUrl);
+      const backupRes = await fetch(satelliteUrl);
       if (backupRes.ok) {
-        const backupText = await backupRes.text();
-        if (backupText && backupText.trim().length > 0) {
-          finalReply = backupText.trim();
+        const text = await backupRes.text();
+        if (text && text.trim().length > 0) {
+          finalReply = text.trim();
         }
       }
     } catch (err) {
-      console.error("Backup satellite uplink failed:", err);
-      if (!lastErrorMsg) lastErrorMsg = err.message;
+      console.error("Backup satellite connection failed:", err);
     }
   }
 
+  // Render & Output
   if (finalReply) {
     HAPTICS.confirm();
     chat.lastChild.innerHTML = `<span class="prefix">J.A.R.V.I.S:</span> ${finalReply}`;
@@ -301,7 +276,7 @@ async function askJarvis(promptText) {
     speak(finalReply);
   } else {
     HAPTICS.error();
-    chat.lastChild.innerHTML = `<span class="prefix">J.A.R.V.I.S:</span> Uplink offline: ${lastErrorMsg || "Network unreachable."}`;
+    chat.lastChild.innerHTML = `<span class="prefix">J.A.R.V.I.S:</span> Uplink offline. Please check network connection.`;
     speak("Uplink disrupted, Boss.");
     conversationHistory.pop();
   }

@@ -1,4 +1,8 @@
-// --- Elements ---
+// ==========================================
+// J.A.R.V.I.S. HUD & CORE INTELLIGENCE ENGINE
+// ==========================================
+
+// --- 1. DOM Elements ---
 const chat = document.getElementById("chat");
 const input = document.getElementById("msg");
 const sendBtn = document.getElementById("send");
@@ -6,29 +10,31 @@ const micBtn = document.getElementById("mic");
 const arcCore = document.getElementById("arc-core");
 const batteryRow = document.getElementById("battery-row");
 
-// Active models to try in order
-const MODELS = ["gemini-1.5-flash", "gemini-2.0-flash"];
-
-// Chat history buffer
+// --- 2. State & Memory ---
 let conversationHistory = [];
 
+// --- 3. Reactive Arc Reactor HUD State ---
 function setReactor(state) {
   if (!arcCore) return;
-  const c = arcCore.querySelector(".center");
-  if (!c) return;
+  const centerRing = arcCore.querySelector(".center");
+  if (!centerRing) return;
 
   if (state === "listening") {
-    c.style.background = "#ff0055";
-    c.style.boxShadow = "0 0 35px #ff0055";
+    centerRing.style.background = "#ff0055";
+    centerRing.style.boxShadow = "0 0 35px #ff0055";
   } else if (state === "thinking") {
-    c.style.background = "#ffb700";
-    c.style.boxShadow = "0 0 35px #ffb700";
+    centerRing.style.background = "#ffaa00";
+    centerRing.style.boxShadow = "0 0 35px #ffaa00";
+  } else if (state === "speaking") {
+    centerRing.style.background = "#00ffaa";
+    centerRing.style.boxShadow = "0 0 35px #00ffaa";
   } else {
-    c.style.background = "#00e5ff";
-    c.style.boxShadow = "0 0 35px #00e5ff";
+    centerRing.style.background = "#00e5ff";
+    centerRing.style.boxShadow = "0 0 35px #00e5ff";
   }
 }
 
+// --- 4. Chat Message Appender ---
 function add(text, who) {
   if (!chat) return;
   const d = document.createElement("div");
@@ -38,34 +44,37 @@ function add(text, who) {
   chat.scrollTop = chat.scrollHeight;
 }
 
+// --- 5. Mobile-Optimized Speech Engine ---
 function speak(text) {
   if (!("speechSynthesis" in window)) return;
   window.speechSynthesis.cancel();
+
+  // Strip markdown formatting (*, #, _, `, ~) for smooth vocal synthesis
   const clean = text.replace(/[*#_`~]/g, "").trim();
-  const u = new SpeechSynthesisUtterance(clean);
-  u.lang = "en-US";
-  u.rate = 1.0;
-  u.pitch = 0.95;
+  const utterance = new SpeechSynthesisUtterance(clean);
+  utterance.lang = "en-US";
+  utterance.rate = 1.05;
+  utterance.pitch = 0.95;
 
   const voices = window.speechSynthesis.getVoices();
-  const enVoice = voices.find(v => v.lang.startsWith("en-GB") || v.lang.startsWith("en"));
-  if (enVoice) u.voice = enVoice;
+  const enVoice = voices.find(v => v.lang.startsWith("en-GB") || v.lang.startsWith("en-US") || v.lang.startsWith("en"));
+  if (enVoice) utterance.voice = enVoice;
 
-  u.onstart = () => setReactor("listening");
-  u.onend = () => setReactor("idle");
-  u.onerror = () => setReactor("idle");
+  utterance.onstart = () => setReactor("speaking");
+  utterance.onend = () => setReactor("idle");
+  utterance.onerror = () => setReactor("idle");
 
-  window.speechSynthesis.speak(u);
+  window.speechSynthesis.speak(utterance);
 }
 
-// Unlock audio on mobile touch
+// Pre-unlock speech synthesizer on initial mobile touch
 window.addEventListener("touchstart", () => {
   if ("speechSynthesis" in window) {
     window.speechSynthesis.speak(new SpeechSynthesisUtterance(""));
   }
 }, { once: true });
 
-// Battery Diagnostics
+// --- 6. Hardware Diagnostics (Battery Monitor) ---
 async function getBatteryStatus() {
   if (navigator.getBattery && batteryRow) {
     try {
@@ -78,16 +87,18 @@ async function getBatteryStatus() {
       update();
       b.addEventListener("levelchange", update);
       b.addEventListener("chargingchange", update);
-    } catch (e) {}
+    } catch (e) {
+      console.warn("Battery telemetry unavailable:", e);
+    }
   }
 }
 getBatteryStatus();
 
-// API Key Manager
+// --- 7. API Key Manager ---
 function getApiKey() {
   let key = localStorage.getItem("GEMINI_API_KEY");
   if (!key || key.trim() === "") {
-    key = prompt("Enter your Gemini API Key:");
+    key = prompt("Enter your Google Gemini API Key (or leave blank to use the public backup satellite):");
     if (key && key.trim() !== "") {
       localStorage.setItem("GEMINI_API_KEY", key.trim());
       return key.trim();
@@ -97,7 +108,7 @@ function getApiKey() {
   return key.trim();
 }
 
-// Instant Local Handlers
+// --- 8. Instant Local Hardware & Command Router ---
 function checkLocalCommand(cmd) {
   const clean = cmd.toLowerCase().trim();
 
@@ -113,21 +124,36 @@ function checkLocalCommand(cmd) {
     return `Today is ${dateStr}, Boss.`;
   }
 
-  // Music shortcut
-  if (clean.includes("play music") || clean.includes("play song")) {
+  // Media trigger
+  if (clean.includes("play music") || clean.includes("play song") || clean.includes("play some music")) {
     setTimeout(() => window.open("https://music.youtube.com", "_blank"), 1000);
     return "Launching YouTube Music now, Boss.";
+  }
+
+  // YouTube trigger
+  if (clean.startsWith("open youtube")) {
+    setTimeout(() => window.open("https://www.youtube.com", "_blank"), 1000);
+    return "Opening YouTube, Boss.";
+  }
+
+  // Google Maps trigger
+  if (clean.includes("navigate to") || clean.includes("where is")) {
+    const query = clean.replace(/navigate to|where is/gi, "").trim();
+    if (query) {
+      setTimeout(() => window.open(`https://www.google.com/maps/search/${encodeURIComponent(query)}`, "_blank"), 1000);
+      return `Mapping coordinates to ${query}, Boss.`;
+    }
   }
 
   return null;
 }
 
-// Main Query Function
+// --- 9. Autonomous Multi-Tier AI Uplink ---
 async function askJarvis(promptText) {
   add(`<span class="prefix">YOU:</span> ${promptText}`, "user");
   if (input) input.value = "";
 
-  // 1. Check local fast-path commands first
+  // 1. Check local shortcuts first
   const localReply = checkLocalCommand(promptText);
   if (localReply) {
     add(`<span class="prefix">J.A.R.V.I.S:</span> ${localReply}`, 'ai');
@@ -135,16 +161,10 @@ async function askJarvis(promptText) {
     return;
   }
 
-  const key = getApiKey();
-  if (!key) {
-    add('<span class="prefix">J.A.R.V.I.S:</span> API Key required to initialize protocols.', 'ai');
-    return;
-  }
-
   add('<span class="prefix">J.A.R.V.I.S:</span> Processing...', 'ai');
   setReactor("thinking");
 
-  // Keep a clean rolling context of last 6 exchanges
+  // Keep a clean rolling context of the last 6 exchanges
   conversationHistory.push({ role: "user", parts: [{ text: promptText }] });
   if (conversationHistory.length > 6) {
     conversationHistory = conversationHistory.slice(-6);
@@ -152,60 +172,85 @@ async function askJarvis(promptText) {
 
   let finalReply = null;
   let lastErrorMsg = "";
+  const key = getApiKey();
 
-  for (let model of MODELS) {
-    try {
-      const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${key}`;
-      const res = await fetch(url, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          system_instruction: {
-            parts: [{ text: "You are J.A.R.V.I.S, Tony Stark's AI assistant. Always address the user as Boss. Respond sharply and concisely in 1 to 2 sentences." }]
-          },
-          contents: conversationHistory
-        })
-      });
+  // --- Tier 1: Primary Gemini Uplink ---
+  if (key) {
+    const modelsToTry = ["gemini-1.5-flash", "gemini-2.0-flash", "gemini-flash-latest"];
+    for (const model of modelsToTry) {
+      try {
+        const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${key}`;
+        const res = await fetch(url, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            system_instruction: {
+              parts: [{ text: "You are J.A.R.V.I.S, Tony Stark's futuristic AI assistant. Always address the user as Boss. Respond sharply, confidently, and concisely in 1 to 2 sentences." }]
+            },
+            contents: conversationHistory
+          })
+        });
 
-      const data = await res.json();
+        const data = await res.json();
 
-      if (data.error) {
-        lastErrorMsg = data.error.message || `Error ${data.error.code}`;
-        // If API key is rejected
-        if (data.error.code === 400 && data.error.message?.includes("API_KEY_INVALID")) {
-          localStorage.removeItem("GEMINI_API_KEY");
-          chat.lastChild.innerHTML = `<span class="prefix">J.A.R.V.I.S:</span> Key invalid. Resetting stored key.`;
-          speak("Invalid API key, Boss.");
-          setReactor("idle");
-          return;
+        if (data.error) {
+          lastErrorMsg = data.error.message || `Error ${data.error.code}`;
+          if (data.error.code === 400 && data.error.message?.includes("API_KEY_INVALID")) {
+            localStorage.removeItem("GEMINI_API_KEY");
+            lastErrorMsg = "Stored API key is invalid. Cleared from storage.";
+            break;
+          }
+          continue; // Try next model tier
         }
-        continue; // Try next model
-      }
 
-      const text = data.candidates?.[0]?.content?.parts?.[0]?.text;
-      if (text) {
-        finalReply = text;
-        break;
+        const candidate = data.candidates?.[0]?.content?.parts?.[0]?.text;
+        if (candidate) {
+          finalReply = candidate;
+          break;
+        }
+      } catch (err) {
+        lastErrorMsg = err.message;
       }
-    } catch (err) {
-      lastErrorMsg = err.message;
     }
   }
 
+  // --- Tier 2: Keyless Satellite Fallback (Pollinations AI) ---
+  // Triggers automatically if Gemini quota is exhausted (429), key is missing, or servers fail
+  if (!finalReply) {
+    try {
+      console.warn("Primary Gemini node failed or unavailable. Switching to secondary satellite uplink...");
+      const systemContext = encodeURIComponent("You are J.A.R.V.I.S, Tony Stark's AI assistant. Always address the user as Boss. Respond sharply and concisely in 1 to 2 sentences.");
+      const userPrompt = encodeURIComponent(promptText);
+      const fallbackUrl = `https://text.pollinations.ai/${userPrompt}?system=${systemContext}`;
+
+      const backupRes = await fetch(fallbackUrl);
+      if (backupRes.ok) {
+        const backupText = await backupRes.text();
+        if (backupText && backupText.trim().length > 0) {
+          finalReply = backupText.trim();
+        }
+      }
+    } catch (err) {
+      console.error("Backup uplink failed:", err);
+      if (!lastErrorMsg) lastErrorMsg = err.message;
+    }
+  }
+
+  // Render & Speak Response
   if (finalReply) {
     chat.lastChild.innerHTML = `<span class="prefix">J.A.R.V.I.S:</span> ${finalReply}`;
     conversationHistory.push({ role: "model", parts: [{ text: finalReply }] });
     speak(finalReply);
   } else {
-    chat.lastChild.innerHTML = `<span class="prefix">J.A.R.V.I.S:</span> ${lastErrorMsg || "Connection failed. Please retry."}`;
-    speak("System error encountered, Boss.");
+    chat.lastChild.innerHTML = `<span class="prefix">J.A.R.V.I.S:</span> Uplink offline: ${lastErrorMsg || "Network unreachable."}`;
+    speak("Uplink disrupted, Boss.");
     conversationHistory.pop();
   }
 
   setReactor("idle");
 }
 
-// Action listeners
+// --- 10. Event Handlers ---
 if (sendBtn) {
   sendBtn.addEventListener("click", () => {
     const val = input ? input.value.trim() : "";
@@ -222,7 +267,7 @@ if (input) {
   });
 }
 
-// Voice Recognition
+// --- 11. Speech Recognition Interface ---
 const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
 if (SpeechRecognition && micBtn) {
   const rec = new SpeechRecognition();

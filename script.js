@@ -4,7 +4,21 @@ const input = document.getElementById("msg");
 const sendBtn = document.getElementById("send");
 const micBtn = document.getElementById("mic");
 
-// --- 2. Append Message Helper ---
+// --- 2. Multi-Turn Conversation Memory ---
+let conversationHistory = [
+  {
+    role: "user",
+    parts: [{ 
+      text: "System prompt: You are J.A.R.V.I.S, Tony Stark's futuristic AI assistant. Always address the user as Boss. Keep responses concise (1 to 2 sentences max) and witty. You have full context of this ongoing conversation." 
+    }]
+  },
+  {
+    role: "model",
+    parts: [{ text: "Understood, Boss. All diagnostics active and memory protocols online. How may I assist?" }]
+  }
+];
+
+// --- 3. Append Message Helper ---
 function add(text, who) {
   if (!chat) return;
   const d = document.createElement("div");
@@ -14,7 +28,7 @@ function add(text, who) {
   chat.scrollTop = chat.scrollHeight;
 }
 
-// --- 3. Speech Synthesis (Speak Pipeline) ---
+// --- 4. Speech Synthesis (Speak Pipeline) ---
 function speak(text) {
   try {
     if ("speechSynthesis" in window) {
@@ -29,7 +43,32 @@ function speak(text) {
   }
 }
 
-// --- 4. Get API Key ---
+// --- 5. Action Execution Module ---
+function checkAndRunAction(promptText) {
+  const clean = promptText.toLowerCase();
+
+  // Play music action
+  if (clean.includes("play music") || clean.includes("play song") || clean.includes("play some music")) {
+    setTimeout(() => {
+      window.open("https://music.youtube.com", "_blank");
+    }, 1500);
+  }
+  // Open YouTube
+  else if (clean.includes("open youtube")) {
+    setTimeout(() => {
+      window.open("https://www.youtube.com", "_blank");
+    }, 1500);
+  }
+  // Open Google Search
+  else if (clean.startsWith("search for ") || clean.startsWith("google ")) {
+    const q = promptText.replace(/search for |google /i, "");
+    setTimeout(() => {
+      window.open(`https://www.google.com/search?q=${encodeURIComponent(q)}`, "_blank");
+    }, 1500);
+  }
+}
+
+// --- 6. Get API Key ---
 function getApiKey() {
   let key = localStorage.getItem("GEMINI_API_KEY");
   if (!key || key.trim() === "") {
@@ -43,7 +82,7 @@ function getApiKey() {
   return key.trim();
 }
 
-// --- 5. Ask Gemini (Think Pipeline) ---
+// --- 7. Gemini AI Brain with History ---
 async function askGemini(promptText) {
   const currentKey = getApiKey();
   if (!currentKey) {
@@ -56,18 +95,22 @@ async function askGemini(promptText) {
   if (input) input.value = "";
   add("J.A.R.V.I.S: Processing...", "ai");
 
+  // Push user prompt to conversation memory
+  conversationHistory.push({
+    role: "user",
+    parts: [{ text: promptText }]
+  });
+
+  // Check if this command triggers a web action
+  checkAndRunAction(promptText);
+
   try {
     const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-flash-latest:generateContent?key=${currentKey}`;
     const response = await fetch(url, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        contents: [
-          {
-            role: "user",
-            parts: [{ text: "You are J.A.R.V.I.S, Tony Stark's AI assistant. Answer concisely in 1-2 sentences and refer to me as Boss. Command: " + promptText }]
-          }
-        ]
+        contents: conversationHistory
       })
     });
 
@@ -77,6 +120,8 @@ async function askGemini(promptText) {
       const errMsg = data.error.message || "API Error";
       chat.lastChild.innerText = "J.A.R.V.I.S: " + errMsg;
       speak("Error: " + errMsg);
+      // Remove failed prompt from history
+      conversationHistory.pop();
       if (data.error.code === 400 || data.error.status === "INVALID_ARGUMENT") {
         localStorage.removeItem("GEMINI_API_KEY");
       }
@@ -84,15 +129,23 @@ async function askGemini(promptText) {
     }
 
     const reply = data.candidates?.[0]?.content?.parts?.[0]?.text || "All systems nominal, Boss.";
+    
+    // Store AI response into memory so next questions remember it
+    conversationHistory.push({
+      role: "model",
+      parts: [{ text: reply }]
+    });
+
     chat.lastChild.innerText = "J.A.R.V.I.S: " + reply;
     speak(reply);
   } catch (err) {
     chat.lastChild.innerText = "J.A.R.V.I.S: Fetch failed - " + err.message;
     speak("Fetch failed, Boss.");
+    conversationHistory.pop();
   }
 }
 
-// --- 6. Send Button & Enter Key Trigger ---
+// --- 8. Event Listeners ---
 if (sendBtn) {
   sendBtn.addEventListener("click", () => {
     const text = input ? input.value.trim() : "";
@@ -109,7 +162,7 @@ if (input) {
   });
 }
 
-// --- 7. Voice Recognition Setup (Listen Pipeline) ---
+// --- 9. Voice Recognition (Push-To-Talk) ---
 if (micBtn) {
   const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
   if (SpeechRecognition) {

@@ -14,7 +14,7 @@ function add(text, who) {
   chat.scrollTop = chat.scrollHeight;
 }
 
-// --- 3. Speech Synthesis ---
+// --- 3. Speech Synthesis (Speak Pipeline) ---
 function speak(text) {
   try {
     if ("speechSynthesis" in window) {
@@ -43,11 +43,12 @@ function getApiKey() {
   return key.trim();
 }
 
-// --- 5. Ask Gemini ---
+// --- 5. Ask Gemini (Think Pipeline) ---
 async function askGemini(promptText) {
   const currentKey = getApiKey();
   if (!currentKey) {
     add("J.A.R.V.I.S: API key required to operate.", "ai");
+    speak("API key required to operate.");
     return;
   }
 
@@ -56,7 +57,7 @@ async function askGemini(promptText) {
   add("J.A.R.V.I.S: Processing...", "ai");
 
   try {
-    const url =  `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.8-flash:generateContent?key=${currentKey}`;
+    const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-flash-latest:generateContent?key=${currentKey}`;
     const response = await fetch(url, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -75,6 +76,7 @@ async function askGemini(promptText) {
     if (data.error) {
       const errMsg = data.error.message || "API Error";
       chat.lastChild.innerText = "J.A.R.V.I.S: " + errMsg;
+      speak("Error: " + errMsg);
       if (data.error.code === 400 || data.error.status === "INVALID_ARGUMENT") {
         localStorage.removeItem("GEMINI_API_KEY");
       }
@@ -86,10 +88,11 @@ async function askGemini(promptText) {
     speak(reply);
   } catch (err) {
     chat.lastChild.innerText = "J.A.R.V.I.S: Fetch failed - " + err.message;
+    speak("Fetch failed, Boss.");
   }
 }
 
-// --- 6. Event Listeners ---
+// --- 6. Send Button & Enter Key Trigger ---
 if (sendBtn) {
   sendBtn.addEventListener("click", () => {
     const text = input ? input.value.trim() : "";
@@ -106,7 +109,7 @@ if (input) {
   });
 }
 
-// --- 7. Voice Recognition Setup ---
+// --- 7. Voice Recognition Setup (Listen Pipeline) ---
 if (micBtn) {
   const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
   if (SpeechRecognition) {

@@ -2,10 +2,9 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
   <title>J.A.R.V.I.S</title>
   
-  <!-- PWA Settings -->
   <link rel="manifest" href="manifest.json">
   <meta name="theme-color" content="#00ffff">
   <meta name="mobile-web-app-capable" content="yes">
@@ -14,47 +13,39 @@
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
-  <header>
-    <h1>J.A.R.V.I.S</h1>
-    <p>SYSTEM ONLINE</p>
-    <div id="hud-clock" class="hud-clock">00:00:00</div>
-  </header>
+  <div class="hud-container">
+    <header>
+      <h1>J.A.R.V.I.S</h1>
+      <p>SYSTEM ONLINE</p>
+    </header>
 
-  <div class="core" id="arc-core">
-    <div class="ring r1"></div>
-    <div class="ring r2"></div>
-    <div class="center"></div>
-  </div>
-  <div class="core-text">ARC REACTOR ACTIVE</div>
+    <div class="reactor-wrapper">
+      <div class="core" id="arc-core">
+        <div class="ring r1"></div>
+        <div class="ring r2"></div>
+        <div class="center"></div>
+      </div>
+      <div class="core-text">ARC REACTOR ACTIVE</div>
+    </div>
 
-  <!-- Audio Waveform Visualizer -->
-  <canvas id="waveform" width="300" height="40"></canvas>
+    <div class="status-panel">
+      <h2>SYSTEM DIAGNOSTICS</h2>
+      <div class="status-row"><span>CORE TEMP</span><span class="status-val on">NORMAL</span></div>
+      <div class="status-row"><span>NETWORK</span><span class="status-val on">SECURE</span></div>
+      <div class="status-row" id="battery-row"><span>POWER LEVEL</span><span class="status-val on">ONLINE</span></div>
+    </div>
 
-  <div class="status">
-    <h2>SYSTEM DIAGNOSTICS</h2>
-    <div class="row"><span>CORE TEMP</span><span class="on">NORMAL</span></div>
-    <div class="row"><span>NETWORK</span><span class="on">SECURE</span></div>
-  </div>
+    <div class="terminal-chat" id="chat">
+      <div class="msg ai"><span class="prefix">J.A.R.V.I.S:</span> Systems operational. How may I assist you, Boss?</div>
+    </div>
 
-  <div class="chat" id="chat">
-    <div class="msg ai">J.A.R.V.I.S: Systems operational. How may I assist you, Boss?</div>
-  </div>
-
-  <div class="input-area">
-    <input type="text" id="msg" placeholder="Enter command..." autocomplete="off">
-    <button id="mic" title="Voice Command">🎤</button>
-    <button id="send">SEND</button>
+    <div class="control-bar">
+      <input type="text" id="msg" placeholder="Enter command..." autocomplete="off">
+      <button id="mic" title="Voice Command">🎤</button>
+      <button id="send">SEND</button>
+    </div>
   </div>
 
   <script src="script.js"></script>
-  <script>
-    if ("serviceWorker" in navigator) {
-      window.addEventListener("load", () => {
-        navigator.serviceWorker.register("./sw.js")
-          .then(() => console.log("J.A.R.V.I.S Service Worker Active"))
-          .catch((err) => console.warn("SW Error:", err));
-      });
-    }
-  </script>
 </body>
 </html>

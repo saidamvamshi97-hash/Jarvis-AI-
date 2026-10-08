@@ -1,17 +1,46 @@
-// ==========================================
-// J.A.R.V.I.S. HUD & CORE INTELLIGENCE ENGINE
-// ==========================================
+// ========================================================
+// J.A.R.V.I.S. HUD ENGINE: VISION, MEMORY & DUAL UPLINK
+// ========================================================
 
 // --- 1. DOM Elements ---
 const chat = document.getElementById("chat");
 const input = document.getElementById("msg");
 const sendBtn = document.getElementById("send");
 const micBtn = document.getElementById("mic");
+const camBtn = document.getElementById("cam-btn");
+const cameraInput = document.getElementById("camera-input");
+const clearBtn = document.getElementById("clear-btn");
 const arcCore = document.getElementById("arc-core");
 const batteryRow = document.getElementById("battery-row");
 
-// --- 2. State & Memory ---
+// --- 2. Persistent Long-Term Memory Controller ---
+const MEMORY_STORAGE_KEY = "JARVIS_PERSISTENT_MEMORY";
 let conversationHistory = [];
+
+try {
+  const saved = localStorage.getItem(MEMORY_STORAGE_KEY);
+  conversationHistory = saved ? JSON.parse(saved) : [];
+} catch (e) {
+  conversationHistory = [];
+}
+
+function persistMemory() {
+  try {
+    // Keep last 10 turns to avoid payload bloating
+    localStorage.setItem(MEMORY_STORAGE_KEY, JSON.stringify(conversationHistory.slice(-10)));
+  } catch (e) {}
+}
+
+// Clear Memory Button Handler
+if (clearBtn) {
+  clearBtn.addEventListener("click", () => {
+    HAPTICS.confirm();
+    conversationHistory = [];
+    localStorage.removeItem(MEMORY_STORAGE_KEY);
+    add('<span class="prefix">J.A.R.V.I.S:</span> Long-term memory cleared, Boss.', 'ai');
+    speak("Memory wiped, Boss.");
+  });
+}
 
 // --- 3. Hardware Haptics & Torch Engine ---
 let cameraStream = null;
@@ -36,9 +65,8 @@ async function toggleTorch(turnOn) {
       if (capabilities.torch) {
         await torchTrack.applyConstraints({ advanced: [{ torch: true }] });
         return true;
-      } else {
-        return false;
       }
+      return false;
     } else {
       if (torchTrack) {
         await torchTrack.applyConstraints({ advanced: [{ torch: false }] });
@@ -49,12 +77,12 @@ async function toggleTorch(turnOn) {
       return true;
     }
   } catch (err) {
-    console.warn("Torch hardware restricted or unsupported:", err);
+    console.warn("Torch hardware restricted:", err);
     return false;
   }
 }
 
-// --- 4. Reactive Arc Reactor HUD State ---
+// --- 4. Reactive Arc Reactor HUD ---
 function setReactor(state) {
   if (!arcCore) return;
   const centerRing = arcCore.querySelector(".center");
@@ -75,7 +103,7 @@ function setReactor(state) {
   }
 }
 
-// --- 5. Chat Message Appender ---
+// --- 5. Message Logging ---
 function add(text, who) {
   if (!chat) return;
   const d = document.createElement("div");
@@ -85,7 +113,7 @@ function add(text, who) {
   chat.scrollTop = chat.scrollHeight;
 }
 
-// --- 6. Mobile-Optimized Speech Engine ---
+// --- 6. Mobile Speech Synthesis ---
 function speak(text) {
   if (!("speechSynthesis" in window)) return;
   window.speechSynthesis.cancel();
@@ -107,14 +135,13 @@ function speak(text) {
   window.speechSynthesis.speak(utterance);
 }
 
-// Pre-unlock speech synthesizer on touch
 window.addEventListener("touchstart", () => {
   if ("speechSynthesis" in window) {
     window.speechSynthesis.speak(new SpeechSynthesisUtterance(""));
   }
 }, { once: true });
 
-// --- 7. Hardware Diagnostics (Battery Monitor) ---
+// --- 7. Hardware Battery Telemetry ---
 async function getBatteryStatus() {
   if (navigator.getBattery && batteryRow) {
     try {
@@ -127,9 +154,7 @@ async function getBatteryStatus() {
       update();
       b.addEventListener("levelchange", update);
       b.addEventListener("chargingchange", update);
-    } catch (e) {
-      console.warn("Battery telemetry unavailable:", e);
-    }
+    } catch (e) {}
   }
 }
 getBatteryStatus();
@@ -139,7 +164,7 @@ function getApiKey() {
   return localStorage.getItem("GEMINI_API_KEY") || null;
 }
 
-// --- 9. Instant Local Hardware & Command Router ---
+// --- 9. Local Hardware & Fast Commands ---
 function checkLocalCommand(cmd) {
   const clean = cmd.toLowerCase().trim();
 
@@ -157,7 +182,7 @@ function checkLocalCommand(cmd) {
     return `Today is ${dateStr}, Boss.`;
   }
 
-  // Flashlight / Torch Controls
+  // Torch controls
   if (clean.includes("torch on") || clean.includes("flashlight on") || clean.includes("lights on")) {
     HAPTICS.confirm();
     toggleTorch(true).then((ok) => {
@@ -187,25 +212,15 @@ function checkLocalCommand(cmd) {
     return "Opening YouTube, Boss.";
   }
 
-  if (clean.includes("navigate to") || clean.includes("where is")) {
-    HAPTICS.confirm();
-    const query = clean.replace(/navigate to|where is/gi, "").trim();
-    if (query) {
-      setTimeout(() => window.open(`https://www.google.com/maps/search/${encodeURIComponent(query)}`, "_blank"), 1000);
-      return `Mapping coordinates to ${query}, Boss.`;
-    }
-  }
-
   return null;
 }
 
-// --- 10. Autonomous AI Uplink with Automatic Quota Failover ---
+// --- 10. Autonomous Dual-Tier AI Text Uplink ---
 async function askJarvis(promptText) {
   HAPTICS.tap();
   add(`<span class="prefix">YOU:</span> ${promptText}`, "user");
   if (input) input.value = "";
 
-  // Check local fast-path commands first
   const localReply = checkLocalCommand(promptText);
   if (localReply) {
     add(`<span class="prefix">J.A.R.V.I.S:</span> ${localReply}`, 'ai');
@@ -217,14 +232,14 @@ async function askJarvis(promptText) {
   setReactor("thinking");
 
   conversationHistory.push({ role: "user", parts: [{ text: promptText }] });
-  if (conversationHistory.length > 6) {
-    conversationHistory = conversationHistory.slice(-6);
+  if (conversationHistory.length > 8) {
+    conversationHistory = conversationHistory.slice(-8);
   }
 
   let finalReply = null;
   const key = getApiKey();
 
-  // Tier 1: Primary Gemini Attempt (if key exists)
+  // Tier 1: Gemini Primary
   if (key) {
     try {
       const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${key}`;
@@ -232,27 +247,24 @@ async function askJarvis(promptText) {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          contents: [{ role: "user", parts: [{ text: "You are J.A.R.V.I.S. Respond sharply to Boss in 1-2 short sentences: " + promptText }] }]
+          system_instruction: {
+            parts: [{ text: "You are J.A.R.V.I.S, Tony Stark's AI assistant. Always address the user as Boss. Respond sharply and concisely in 1 to 2 sentences." }]
+          },
+          contents: conversationHistory
         })
       });
 
       const data = await res.json();
-
-      // If Google succeeds without errors or quota lockouts
       if (!data.error && data.candidates?.[0]?.content?.parts?.[0]?.text) {
         finalReply = data.candidates[0].content.parts[0].text;
-      } else {
-        console.warn("Gemini quota or error encountered. Instantly routing to backup satellite...");
       }
-    } catch (err) {
-      console.warn("Gemini request failed. Routing to backup satellite...");
-    }
+    } catch (err) {}
   }
 
-  // Tier 2: Free AI Satellite (Unlimited, no API key needed, never locks out)
+  // Tier 2: Free Satellite Fallback (Keyless & Unlimited)
   if (!finalReply) {
     try {
-      const sysInstruction = encodeURIComponent("You are J.A.R.V.I.S, Tony Stark's AI assistant. Always address the user as Boss. Respond sharply and concisely in 1 or 2 sentences.");
+      const sysInstruction = encodeURIComponent("You are J.A.R.V.I.S, Tony Stark's AI assistant. Address the user as Boss. Respond sharply in 1-2 sentences.");
       const promptClean = encodeURIComponent(promptText);
       const satelliteUrl = `https://text.pollinations.ai/${promptClean}?system=${sysInstruction}`;
 
@@ -263,20 +275,18 @@ async function askJarvis(promptText) {
           finalReply = text.trim();
         }
       }
-    } catch (err) {
-      console.error("Backup satellite connection failed:", err);
-    }
+    } catch (err) {}
   }
 
-  // Render & Output
   if (finalReply) {
     HAPTICS.confirm();
     chat.lastChild.innerHTML = `<span class="prefix">J.A.R.V.I.S:</span> ${finalReply}`;
     conversationHistory.push({ role: "model", parts: [{ text: finalReply }] });
+    persistMemory();
     speak(finalReply);
   } else {
     HAPTICS.error();
-    chat.lastChild.innerHTML = `<span class="prefix">J.A.R.V.I.S:</span> Uplink offline. Please check network connection.`;
+    chat.lastChild.innerHTML = `<span class="prefix">J.A.R.V.I.S:</span> Uplink offline. Please check network.`;
     speak("Uplink disrupted, Boss.");
     conversationHistory.pop();
   }
@@ -284,7 +294,76 @@ async function askJarvis(promptText) {
   setReactor("idle");
 }
 
-// --- 11. Event Handlers ---
+// --- 11. Computer Vision ("Eyes") Engine ---
+if (camBtn && cameraInput) {
+  camBtn.addEventListener("click", () => {
+    HAPTICS.tap();
+    cameraInput.click();
+  });
+
+  cameraInput.addEventListener("change", async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    add('<span class="prefix">YOU:</span> [Visual Telemetry Provided]', 'user');
+    add('<span class="prefix">J.A.R.V.I.S:</span> Analyzing visual feed...', 'ai');
+    setReactor("thinking");
+
+    const reader = new FileReader();
+    reader.onloadend = async () => {
+      const base64Data = reader.result.split(',')[1];
+      await analyzeVisualData(base64Data, file.type);
+    };
+    reader.readAsDataURL(file);
+  });
+}
+
+async function analyzeVisualData(base64Image, mimeType) {
+  const key = getApiKey();
+  let visionReply = null;
+
+  if (key) {
+    try {
+      const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${key}`;
+      const res = await fetch(url, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          contents: [{
+            parts: [
+              { text: "You are J.A.R.V.I.S. Describe what you see in front of you in 1-2 sharp, professional sentences addressing Boss." },
+              { inline_data: { mime_type: mimeType, data: base64Image } }
+            ]
+          }]
+        })
+      });
+
+      const data = await res.json();
+      if (!data.error && data.candidates?.[0]?.content?.parts?.[0]?.text) {
+        visionReply = data.candidates[0].content.parts[0].text;
+      }
+    } catch (err) {
+      console.warn("Gemini vision analysis failed:", err);
+    }
+  }
+
+  if (visionReply) {
+    HAPTICS.confirm();
+    chat.lastChild.innerHTML = `<span class="prefix">J.A.R.V.I.S:</span> ${visionReply}`;
+    conversationHistory.push({ role: "user", parts: [{ text: "[Sent image for visual analysis]" }] });
+    conversationHistory.push({ role: "model", parts: [{ text: visionReply }] });
+    persistMemory();
+    speak(visionReply);
+  } else {
+    HAPTICS.error();
+    chat.lastChild.innerHTML = `<span class="prefix">J.A.R.V.I.S:</span> Visual optical feed failed to process, Boss.`;
+    speak("Vision scan failed, Boss.");
+  }
+
+  setReactor("idle");
+}
+
+// --- 12. Input & Speech Recognition Event Handlers ---
 if (sendBtn) {
   sendBtn.addEventListener("click", () => {
     const val = input ? input.value.trim() : "";
@@ -301,7 +380,6 @@ if (input) {
   });
 }
 
-// --- 12. Speech Recognition Interface ---
 const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
 if (SpeechRecognition && micBtn) {
   const rec = new SpeechRecognition();

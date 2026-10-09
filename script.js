@@ -1,5 +1,5 @@
 // =========================================================================
-// J.A.R.V.I.S. MOBILE ASSISTANT - BULLETPROOF CONTROLLER (EPISODE 05-07)
+// J.A.R.V.I.S. ULTRA LOW-LATENCY CONTROLLER (SUB-SECOND EXECUTION)
 // =========================================================================
 
 // --- 1. DOM Elements ---
@@ -10,45 +10,23 @@ const micBtn = document.getElementById("mic") || document.getElementById("mic-bt
 const camBtn = document.getElementById("cam-btn") || document.getElementById("cam");
 const clearBtn = document.getElementById("clear-btn") || document.getElementById("clear");
 const imgInput = document.getElementById("img-input") || document.getElementById("camera-input");
-const arcCore = document.getElementById("arc-core") || document.querySelector(".center");
-const batteryRow = document.getElementById("battery-row");
 
-// --- 2. State & Memory ---
-let conversationHistory = [];
+// --- 2. Compact Memory (Limited to last 3 items for fastest payload size) ---
+let MEMORY = [];
 try {
   const saved = localStorage.getItem("jarvis_memory");
-  if (saved) conversationHistory = JSON.parse(saved);
+  if (saved) MEMORY = JSON.parse(saved).slice(-3);
 } catch (e) {
-  conversationHistory = [];
+  MEMORY = [];
 }
 
-function persistMemory() {
+function saveMemory() {
   try {
-    localStorage.setItem("jarvis_memory", JSON.stringify(conversationHistory.slice(-10)));
+    localStorage.setItem("jarvis_memory", JSON.stringify(MEMORY.slice(-3)));
   } catch (e) {}
 }
 
-// --- 3. Reactive Arc Reactor HUD ---
-function setReactor(state) {
-  const centerRing = document.querySelector(".center");
-  if (!centerRing) return;
-
-  if (state === "listening") {
-    centerRing.style.background = "#ff0055";
-    centerRing.style.boxShadow = "0 0 35px #ff0055";
-  } else if (state === "thinking") {
-    centerRing.style.background = "#ffaa00";
-    centerRing.style.boxShadow = "0 0 35px #ffaa00";
-  } else if (state === "speaking") {
-    centerRing.style.background = "#00ffaa";
-    centerRing.style.boxShadow = "0 0 35px #00ffaa";
-  } else {
-    centerRing.style.background = "#00e5ff";
-    centerRing.style.boxShadow = "0 0 35px #00e5ff";
-  }
-}
-
-// --- 4. Chat Message Appender ---
+// --- 3. Instant UI & Speech Synthesis ---
 function add(text, who) {
   if (!chat) return;
   const d = document.createElement("div");
@@ -58,178 +36,131 @@ function add(text, who) {
   chat.scrollTop = chat.scrollHeight;
 }
 
-// --- 5. Mobile Speech Synthesis ---
-function speak(text) {
+function speakFast(text) {
   if (!("speechSynthesis" in window)) return;
   window.speechSynthesis.cancel();
 
-  // Strip HTML tags and markdown symbols before speaking aloud
   const clean = text.replace(/<[^>]*>?/gm, "").replace(/[*#_`~]/g, "").trim();
   const utterance = new SpeechSynthesisUtterance(clean);
   utterance.lang = "en-US";
-  utterance.rate = 1.05;
-  utterance.pitch = 0.95;
+  utterance.rate = 1.15; // Slightly faster playback for snappier audio response
+  utterance.pitch = 1.0;
 
   const voices = window.speechSynthesis.getVoices();
-  const enVoice = voices.find(v => v.lang.startsWith("en-GB") || v.lang.startsWith("en-US") || v.lang.startsWith("en"));
+  const enVoice = voices.find(v => v.lang.startsWith("en-US") || v.lang.startsWith("en"));
   if (enVoice) utterance.voice = enVoice;
-
-  utterance.onstart = () => setReactor("speaking");
-  utterance.onend = () => setReactor("idle");
-  utterance.onerror = () => setReactor("idle");
 
   window.speechSynthesis.speak(utterance);
 }
 
-// Pre-unlock speech synthesizer on touch
-window.addEventListener("touchstart", () => {
-  if ("speechSynthesis" in window) {
-    window.speechSynthesis.speak(new SpeechSynthesisUtterance(""));
-  }
-}, { once: true });
-
-// --- 6. API Key Manager ---
-function getApiKey() {
-  return localStorage.getItem("jarvis_key") || localStorage.getItem("GEMINI_API_KEY") || null;
-}
-
-// --- 7. SPECIALIZED VOICE SONG & LOCAL HARDWARE ROUTER ---
-function checkLocalCommand(cmd) {
+// --- 4. Zero-Latency Local Action Engine (0 ms) ---
+function runFastAction(cmd) {
   const clean = cmd.toLowerCase().trim();
 
-  // Instant local time
+  // Instant Clock
   if (clean.includes("time")) {
-    const timeStr = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
-    return `The current time is ${timeStr}, Boss.`;
+    const time = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    return `It is ${time}, Boss.`;
   }
 
-  // Instant local date
-  if (clean.includes("date today") || clean === "what is today" || clean === "date") {
-    const dateStr = new Date().toLocaleDateString(undefined, { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
-    return `Today is ${dateStr}, Boss.`;
+  // Instant Date
+  if (clean.includes("date") || clean.includes("today")) {
+    const date = new Date().toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' });
+    return `Today is ${date}, Boss.`;
   }
 
-  // ----------------------------------------------------
-  // BULLETPROOF YOUTUBE & MUSIC ROUTER
-  // ----------------------------------------------------
-  if (
-    clean.includes("youtube") || 
-    clean.includes("song") || 
-    clean.includes("songs") || 
-    clean.includes("play") || 
-    clean.includes("music")
-  ) {
-    // Strip common filler words regardless of placement in the sentence
-    let query = clean
+  // Instant Media Launcher
+  if (clean.includes("youtube") || clean.includes("song") || clean.includes("play") || clean.includes("music")) {
+    let q = clean
       .replace(/\b(open|play|search|find|on|in|to|stream|listen)\b/gi, "")
       .replace(/\b(youtube|spotify|music|song|songs|video|videos)\b/gi, "")
-      .trim();
+      .trim() || "Telugu songs";
 
-    if (!query) query = "Telugu hit songs";
-
-    const targetUrl = `https://www.youtube.com/results?search_query=${encodeURIComponent(query)}`;
-
-    // Open immediately to bypass Android popup blockers
-    setTimeout(() => {
-      const win = window.open(targetUrl, "_blank");
-      if (!win) window.location.href = targetUrl;
-    }, 250);
-
-    return `Streaming "${query}" on YouTube, Boss. If it did not open automatically, <a href="${targetUrl}" target="_blank" style="color:#00ffaa;text-decoration:underline;font-weight:bold;">tap here to launch</a>.`;
+    const targetUrl = `https://www.youtube.com/results?search_query=${encodeURIComponent(q)}`;
+    window.open(targetUrl, "_blank");
+    return `Streaming "${q}" on YouTube, Boss.`;
   }
 
   return null;
 }
 
-// --- 8. AI Uplink with Failover & Timeout Protection ---
-async function askJarvis(promptText) {
-  if (!promptText || promptText.trim() === "") return;
+// --- 5. High-Speed Gemini Flash Engine ---
+async function askFastAI(promptText) {
+  if (!promptText || !promptText.trim()) return;
 
   add(`<span class="prefix">YOU:</span> ${promptText}`, "user");
   if (input) input.value = "";
 
-  // 1. Check local fast-path commands and music router first
-  const localReply = checkLocalCommand(promptText);
-  if (localReply) {
-    add(`<span class="prefix">J.A.R.V.I.S:</span> ${localReply}`, 'ai');
-    speak(localReply);
+  // 1. Check local device triggers first (0 ms delay)
+  const localOutput = runFastAction(promptText);
+  if (localOutput) {
+    add(`<span class="prefix">J.A.R.V.I.S:</span> ${localOutput}`, "ai");
+    speakFast(localOutput);
     return;
   }
 
-  add('<span class="prefix">J.A.R.V.I.S:</span> Thinking...', 'ai');
-  setReactor("thinking");
+  add('<span class="prefix">J.A.R.V.I.S:</span> ...', 'ai');
 
-  conversationHistory.push({ role: "user", parts: [{ text: promptText }] });
-  if (conversationHistory.length > 6) conversationHistory = conversationHistory.slice(-6);
+  const key = localStorage.getItem("jarvis_key");
+  let reply = null;
 
-  let finalReply = null;
-  const key = getApiKey();
-
-  // Tier 1: Gemini API Call with 5-Second Timeout
   if (key) {
     try {
+      // Direct call to Gemini 2.0 Flash with token cap and 4-second timeout
       const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 5000);
+      const timeoutId = setTimeout(() => controller.abort(), 4000);
 
-      const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${key}`;
-      const res = await fetch(url, {
+      const contents = MEMORY.map(m => ({ role: m.role, parts: [{ text: m.text }] }));
+      contents.push({ role: "user", parts: [{ text: promptText }] });
+
+      const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${key}`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         signal: controller.signal,
         body: JSON.stringify({
-          contents: [{ role: "user", parts: [{ text: "You are J.A.R.V.I.S. Respond sharply to Boss in 1-2 short sentences: " + promptText }] }]
+          contents: contents,
+          systemInstruction: { parts: [{ text: "You are J.A.R.V.I.S. Respond directly to Boss in one short, complete sentence without preamble." }] },
+          generationConfig: {
+            maxOutputTokens: 60, // Short response cap dramatically lowers latency
+            temperature: 0.2
+          }
         })
       });
       clearTimeout(timeoutId);
 
       const data = await res.json();
-      if (!data.error && data.candidates?.[0]?.content?.parts?.[0]?.text) {
-        finalReply = data.candidates[0].content.parts[0].text;
+      if (data.candidates?.[0]?.content?.parts?.[0]?.text) {
+        reply = data.candidates[0].content.parts[0].text.trim();
       }
-    } catch (err) {
-      console.warn("Primary Gemini uplink timed out or failed. Routing to backup satellite...");
+    } catch (e) {
+      console.warn("Primary fast endpoint skipped or timed out:", e);
     }
   }
 
-  // Tier 2: Free Satellite Fallback (Pollinations AI)
-  if (!finalReply) {
+  // Backup keyless endpoint fallback
+  if (!reply) {
     try {
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 6000);
-
-      const fallbackUrl = `https://text.pollinations.ai/${encodeURIComponent(promptText)}?system=${encodeURIComponent("You are J.A.R.V.I.S, Tony Stark's AI assistant. Address the user as Boss. Respond sharply and concisely in 1 to 2 sentences.")}`;
-      const backupRes = await fetch(fallbackUrl, { signal: controller.signal });
-      clearTimeout(timeoutId);
-
-      if (backupRes.ok) {
-        const text = await backupRes.text();
-        if (text && text.trim().length > 0) finalReply = text.trim();
-      }
-    } catch (err) {
-      console.error("Backup satellite connection timed out:", err);
-    }
+      const res = await fetch(`https://text.pollinations.ai/${encodeURIComponent(promptText)}?system=${encodeURIComponent("Respond to Boss in 1 short sentence.")}`);
+      if (res.ok) reply = (await res.text()).trim();
+    } catch (e) {}
   }
 
-  // Update UI and Synthesize Speech
-  if (finalReply) {
-    chat.lastChild.innerHTML = `<span class="prefix">J.A.R.V.I.S:</span> ${finalReply}`;
-    conversationHistory.push({ role: "model", parts: [{ text: finalReply }] });
-    persistMemory();
-    speak(finalReply);
+  if (reply) {
+    chat.lastChild.innerHTML = `<span class="prefix">J.A.R.V.I.S:</span> ${reply}`;
+    MEMORY.push({ role: "user", text: promptText });
+    MEMORY.push({ role: "model", text: reply });
+    saveMemory();
+    speakFast(reply);
   } else {
-    chat.lastChild.innerHTML = `<span class="prefix">J.A.R.V.I.S:</span> Uplink offline or query timed out. Please try again.`;
-    speak("Uplink disrupted, Boss.");
-    conversationHistory.pop();
+    chat.lastChild.innerHTML = `<span class="prefix">J.A.R.V.I.S:</span> Ready. Please check key.`;
   }
-
-  setReactor("idle");
 }
 
-// --- 9. SEND & KEYBOARD LISTENERS ---
+// --- 6. Event Listeners ---
 if (sendBtn) {
   sendBtn.onclick = () => {
     const val = input ? input.value.trim() : "";
-    if (val) askJarvis(val);
+    if (val) askFastAI(val);
   };
 }
 
@@ -237,106 +168,37 @@ if (input) {
   input.addEventListener("keydown", (e) => {
     if (e.key === "Enter") {
       const val = input.value.trim();
-      if (val) askJarvis(val);
+      if (val) askFastAI(val);
     }
   });
 }
 
-// --- 10. CLEAR MEMORY BUTTON ---
-if (clearBtn) {
-  clearBtn.onclick = () => {
-    conversationHistory = [];
-    localStorage.removeItem("jarvis_memory");
-    add('<span class="prefix">SYSTEM:</span> Memory wiped clean, Boss.', 'ai');
-    speak("Memory cleared, Boss.");
-  };
-}
-
-// --- 11. CAMERA VISION ("THE EYES") ---
-if (camBtn && imgInput) {
-  camBtn.onclick = () => imgInput.click();
-
-  imgInput.onchange = () => {
-    const file = imgInput.files[0];
-    if (!file) return;
-
-    add('<span class="prefix">YOU:</span> [Photo Telemetry Uploaded]', 'user');
-    add('<span class="prefix">J.A.R.V.I.S:</span> Analyzing visual telemetry...', 'ai');
-    setReactor("thinking");
-
-    const reader = new FileReader();
-    reader.onload = async () => {
-      const base64 = reader.result.split(',')[1];
-      const key = getApiKey();
-      let reply = null;
-
-      if (key) {
-        try {
-          const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${key}`;
-          const res = await fetch(url, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              contents: [{
-                parts: [
-                  { text: "Describe what you see in 1-2 sharp sentences addressing Boss:" },
-                  { inline_data: { mime_type: file.type, data: base64 } }
-                ]
-              }]
-            })
-          });
-          const data = await res.json();
-          if (data.candidates?.[0]?.content?.parts?.[0]?.text) {
-            reply = data.candidates[0].content.parts[0].text;
-          }
-        } catch (e) {}
-      }
-
-      if (reply) {
-        chat.lastChild.innerHTML = `<span class="prefix">J.A.R.V.I.S:</span> ${reply}`;
-        speak(reply);
-      } else {
-        chat.lastChild.innerHTML = `<span class="prefix">J.A.R.V.I.S:</span> Visual optical feed failed to process, Boss.`;
-        speak("Vision scan failed, Boss.");
-      }
-      setReactor("idle");
-    };
-    reader.readAsDataURL(file);
-  };
-}
-
-// --- 12. SPEECH RECOGNITION (MIC) ---
-const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-if (SpeechRecognition && micBtn) {
-  const rec = new SpeechRecognition();
+// Low-latency voice setup
+const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+if (SR && micBtn) {
+  const rec = new SR();
   rec.lang = "en-US";
   rec.interimResults = false;
 
   micBtn.onclick = () => {
-    try {
-      setReactor("listening");
-      micBtn.innerText = "🔴";
-      rec.start();
-    } catch (e) {
-      rec.stop();
-      micBtn.innerText = "🎤";
-      setReactor("idle");
-    }
+    micBtn.innerText = "🔴";
+    rec.start();
   };
 
   rec.onresult = (e) => {
-    const transcript = e.results[0][0].transcript;
-    if (input) input.value = transcript;
-    askJarvis(transcript);
+    const text = e.results[0][0].transcript;
+    if (input) input.value = text;
+    askFastAI(text);
   };
 
-  rec.onend = () => {
-    micBtn.innerText = "🎤";
-    setReactor("idle");
-  };
+  rec.onend = () => { micBtn.innerText = "🎤"; };
+  rec.onerror = () => { micBtn.innerText = "🎤"; };
+}
 
-  rec.onerror = () => {
-    micBtn.innerText = "🎤";
-    setReactor("idle");
+if (clearBtn) {
+  clearBtn.onclick = () => {
+    MEMORY = [];
+    localStorage.removeItem("jarvis_memory");
+    add("SYSTEM: Memory cleared.", "ai");
   };
-        }
+}

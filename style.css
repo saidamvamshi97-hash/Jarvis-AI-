@@ -1,226 +1,236 @@
-@import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;600;800&family=Rajdhani:wght@500;700&display=swap');
-
 * {
   margin: 0;
   padding: 0;
   box-sizing: border-box;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Courier New", monospace;
+  -webkit-tap-highlight-color: transparent;
 }
 
 body {
-  background-color: #000000;
+  background-color: #03080e;
   color: #00e5ff;
-  font-family: 'Rajdhani', sans-serif;
   min-height: 100vh;
   display: flex;
   justify-content: center;
   align-items: flex-start;
-  padding: 16px 12px;
   overflow-x: hidden;
+  padding-bottom: 20px;
 }
 
 .hud-container {
   width: 100%;
   max-width: 440px;
+  min-height: 100vh;
   display: flex;
   flex-direction: column;
-  gap: 14px;
+  padding: 14px 14px 20px 14px;
+  position: relative;
 }
 
 /* Header */
 header {
   text-align: center;
+  margin-top: 6px;
+  margin-bottom: 10px;
 }
 
-header h1 {
-  font-family: 'Orbitron', sans-serif;
-  font-size: 32px;
-  letter-spacing: 8px;
-  color: #00f0ff;
-  text-shadow: 0 0 10px rgba(0, 240, 255, 0.8), 0 0 24px rgba(0, 240, 255, 0.4);
+h1.glitch {
+  font-size: 2.2rem;
+  font-weight: 900;
+  letter-spacing: 7px;
+  color: #00e5ff;
+  text-shadow: 0 0 12px rgba(0, 229, 255, 0.8), 0 0 24px rgba(0, 229, 255, 0.4);
 }
 
-header p {
-  font-family: 'Orbitron', sans-serif;
-  font-size: 10px;
-  letter-spacing: 4px;
-  color: rgba(0, 240, 255, 0.7);
+.status-text {
+  font-size: 0.72rem;
+  letter-spacing: 3px;
+  color: #00ffaa;
+  opacity: 0.85;
   margin-top: 2px;
 }
 
 /* Arc Reactor */
-.reactor-wrapper {
+.reactor-container {
   display: flex;
   flex-direction: column;
   align-items: center;
-  margin: 4px 0;
+  justify-content: center;
+  margin: 8px 0 14px 0;
 }
 
-.core {
+.arc-reactor {
+  width: 120px;
+  height: 120px;
   position: relative;
-  width: 160px;
-  height: 160px;
   display: flex;
-  justify-content: center;
   align-items: center;
+  justify-content: center;
 }
 
 .ring {
   position: absolute;
   border-radius: 50%;
-  box-shadow: 0 0 12px rgba(0, 229, 255, 0.6);
+  border: 2px solid transparent;
 }
 
-.r1 {
-  width: 154px;
-  height: 154px;
-  border: 4px solid #00e5ff;
-  border-top-color: transparent;
-  animation: spin 3s linear infinite;
+.ring.outer {
+  width: 116px;
+  height: 116px;
+  border-top: 2.5px solid #00e5ff;
+  border-bottom: 2.5px solid #00e5ff;
+  box-shadow: 0 0 18px rgba(0, 229, 255, 0.4);
+  animation: spinClockwise 9s linear infinite;
 }
 
-.r2 {
-  width: 122px;
-  height: 122px;
-  border: 3px solid #00bcd4;
-  border-bottom-color: transparent;
-  animation: spin 2.2s linear infinite reverse;
+.ring.middle {
+  width: 90px;
+  height: 90px;
+  border-left: 2px solid rgba(0, 229, 255, 0.7);
+  border-right: 2px solid rgba(0, 229, 255, 0.7);
+  animation: spinCounter 6s linear infinite;
+}
+
+.ring.inner {
+  width: 68px;
+  height: 68px;
+  border: 1.5px dashed rgba(0, 255, 170, 0.6);
+  animation: spinClockwise 4s linear infinite;
 }
 
 .center {
-  width: 68px;
-  height: 68px;
+  width: 44px;
+  height: 44px;
   background: #00e5ff;
   border-radius: 50%;
-  box-shadow: 0 0 35px #00e5ff, inset 0 0 12px rgba(0, 0, 0, 0.5);
-  animation: pulse 1.8s ease-in-out infinite;
+  box-shadow: 0 0 25px #00e5ff, 0 0 50px rgba(0, 229, 255, 0.8);
   transition: all 0.3s ease;
 }
 
-@keyframes spin {
+.reactor-status {
+  margin-top: 8px;
+  font-size: 0.7rem;
+  letter-spacing: 2px;
+  color: #00e5ff;
+  opacity: 0.8;
+}
+
+@keyframes spinClockwise {
+  from { transform: rotate(0deg); }
   to { transform: rotate(360deg); }
 }
 
-@keyframes pulse {
-  0%, 100% { opacity: 0.95; transform: scale(1); }
-  50% { opacity: 0.6; transform: scale(0.96); }
-}
-
-.core-text {
-  font-family: 'Orbitron', sans-serif;
-  font-size: 11px;
-  letter-spacing: 4px;
-  color: #00e5ff;
-  margin-top: 14px;
-  opacity: 0.85;
+@keyframes spinCounter {
+  from { transform: rotate(360deg); }
+  to { transform: rotate(0deg); }
 }
 
 /* System Diagnostics Box */
-.status-panel {
-  border: 1px solid rgba(0, 229, 255, 0.4);
-  background: rgba(0, 30, 40, 0.25);
-  padding: 12px 14px;
-  border-radius: 2px;
+.diagnostic-panel {
+  background: rgba(4, 20, 33, 0.65);
+  border: 1px solid rgba(0, 229, 255, 0.35);
+  border-radius: 8px;
+  padding: 8px 12px;
+  margin-bottom: 12px;
+  font-size: 0.75rem;
 }
 
-.status-panel h2 {
-  font-family: 'Orbitron', sans-serif;
-  font-size: 11px;
-  letter-spacing: 2px;
+.panel-header {
+  font-weight: bold;
+  letter-spacing: 1.5px;
+  margin-bottom: 6px;
   color: #00e5ff;
-  margin-bottom: 8px;
 }
 
-.status-row {
+.telemetry-row {
   display: flex;
   justify-content: space-between;
-  font-size: 13px;
-  letter-spacing: 1px;
-  color: #00e5ff;
-  margin: 4px 0;
-  font-weight: 600;
+  margin: 3px 0;
+  color: rgba(0, 229, 255, 0.85);
 }
 
-.status-val.on {
-  color: #00ff77;
-  text-shadow: 0 0 6px rgba(0, 255, 119, 0.6);
+.val-ok {
+  color: #00ffaa;
+  font-weight: bold;
 }
 
 /* Terminal Chat Box */
 .terminal-chat {
-  border: 1px solid rgba(0, 229, 255, 0.4);
-  background: rgba(0, 20, 28, 0.4);
-  height: 220px;
-  overflow-y: auto;
+  flex: 1;
+  min-height: 220px;
+  max-height: 290px;
+  background: rgba(2, 12, 22, 0.7);
+  border: 1px solid rgba(0, 229, 255, 0.3);
+  border-radius: 8px;
   padding: 10px;
+  overflow-y: auto;
   display: flex;
   flex-direction: column;
-  gap: 8px;
-  border-radius: 2px;
+  gap: 10px;
+  margin-bottom: 12px;
 }
 
 .msg {
   padding: 8px 10px;
-  border-left: 2px solid #00e5ff;
-  background: rgba(0, 229, 255, 0.05);
-  font-size: 13px;
-  line-height: 1.4;
-  letter-spacing: 0.5px;
+  border-radius: 6px;
+  font-size: 0.82rem;
+  line-height: 1.45;
   word-break: break-word;
 }
 
+.msg.ai {
+  background: rgba(0, 229, 255, 0.08);
+  border-left: 3px solid #00e5ff;
+  color: #c4f3ff;
+}
+
 .msg.user {
-  border-left: 2px solid #ffffff;
-  color: #ffffff;
   background: rgba(255, 255, 255, 0.05);
+  border-left: 3px solid #00ffaa;
+  color: #e6f9ff;
 }
 
-.msg .prefix {
-  font-weight: 700;
-  font-family: 'Orbitron', sans-serif;
-  font-size: 11px;
-  margin-right: 4px;
+.prefix {
+  font-weight: bold;
+  letter-spacing: 1px;
 }
 
-/* Control Input Area */
-.control-bar {
+.msg.ai .prefix { color: #00e5ff; }
+.msg.user .prefix { color: #00ffaa; }
+
+/* Fixed Inline Command Bar */
+.command-bar {
   display: flex;
+  align-items: center;
   gap: 6px;
-  height: 44px;
+  width: 100%;
 }
 
-input[type="text"] {
+.command-bar input {
   flex: 1;
-  background: #000000;
-  border: 1px solid rgba(0, 229, 255, 0.5);
+  height: 42px;
+  background: rgba(2, 15, 28, 0.9);
+  border: 1px solid rgba(0, 229, 255, 0.45);
+  border-radius: 6px;
   color: #00e5ff;
   padding: 0 10px;
-  font-family: 'Rajdhani', sans-serif;
-  font-size: 14px;
-  letter-spacing: 1px;
-  border-radius: 2px;
+  font-size: 0.82rem;
   outline: none;
-  min-width: 0;
 }
 
-input[type="text"]:focus {
-  border-color: #00e5ff;
-  box-shadow: 0 0 8px rgba(0, 229, 255, 0.5);
+.command-bar input:focus {
+  border-color: #00ffaa;
+  box-shadow: 0 0 10px rgba(0, 255, 170, 0.3);
 }
 
-input[type="text"]::placeholder {
-  color: rgba(0, 229, 255, 0.4);
-}
-
-button {
-  background: #00e5ff;
-  color: #000000;
-  border: none;
-  font-family: 'Orbitron', sans-serif;
-  font-size: 12px;
-  font-weight: 800;
-  letter-spacing: 1px;
-  padding: 0 12px;
-  border-radius: 2px;
+.command-bar button {
+  height: 42px;
+  background: rgba(0, 229, 255, 0.12);
+  border: 1px solid rgba(0, 229, 255, 0.45);
+  border-radius: 6px;
+  color: #00e5ff;
+  font-size: 0.9rem;
+  padding: 0 10px;
   cursor: pointer;
   display: flex;
   align-items: center;
@@ -228,19 +238,60 @@ button {
   flex-shrink: 0;
 }
 
-button:active {
-  background: #00b8cc;
+.command-bar button#send {
+  background: #00e5ff;
+  color: #03080e;
+  font-weight: 800;
+  font-size: 0.78rem;
+  letter-spacing: 1px;
+  padding: 0 14px;
 }
 
-#mic, #cam-btn, #clear-btn {
-  background: transparent;
-  border: 1px solid rgba(0, 229, 255, 0.5);
+.command-bar button:active {
+  transform: scale(0.96);
+}
+
+/* Holographic Mini-Screen Overlay (Sits cleanly right above bottom bar) */
+#holo-screen {
+  display: none;
+  position: absolute;
+  bottom: 64px;
+  left: 14px;
+  right: 14px;
+  height: 210px;
+  background: #031320;
+  border: 1.5px solid #00e5ff;
+  border-radius: 10px;
+  box-shadow: 0 0 25px rgba(0, 229, 255, 0.45);
+  z-index: 50;
+  overflow: hidden;
+}
+
+#holo-header {
+  background: #022033;
   color: #00e5ff;
-  font-size: 15px;
-  padding: 0 10px;
+  font-size: 0.72rem;
+  font-weight: bold;
+  letter-spacing: 1px;
+  padding: 6px 10px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  border-bottom: 1px solid rgba(0, 229, 255, 0.3);
 }
 
-#clear-btn:active {
-  background: rgba(255, 0, 85, 0.3);
-  border-color: #ff0055;
+#holo-close {
+  background: transparent;
+  border: none;
+  color: #ff0055;
+  font-size: 1rem;
+  font-weight: bold;
+  cursor: pointer;
+  padding: 0 4px;
+}
+
+#holo-frame {
+  width: 100%;
+  height: calc(100% - 28px);
+  border: none;
 }

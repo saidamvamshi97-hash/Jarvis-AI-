@@ -1,8 +1,8 @@
- // =========================================================================
+// =========================================================================
 // J.A.R.V.I.S. MOBILE ASSISTANT - BULLETPROOF CONTROLLER (EPISODE 05-07)
 // =========================================================================
 
-// --- 1. DOM Elements (Safe Dual-ID Fallback Selector) ---
+// --- 1. DOM Elements ---
 const chat = document.getElementById("chat");
 const input = document.getElementById("msg") || document.getElementById("input");
 const sendBtn = document.getElementById("send") || document.getElementById("send-btn");
@@ -13,7 +13,7 @@ const imgInput = document.getElementById("img-input") || document.getElementById
 const arcCore = document.getElementById("arc-core") || document.querySelector(".center");
 const batteryRow = document.getElementById("battery-row");
 
-// --- 2. State & Long-Term Memory ---
+// --- 2. State & Memory ---
 let conversationHistory = [];
 try {
   const saved = localStorage.getItem("jarvis_memory");
@@ -28,7 +28,7 @@ function persistMemory() {
   } catch (e) {}
 }
 
-// --- 3. Reactive Arc Reactor Visuals ---
+// --- 3. Reactive Arc Reactor HUD ---
 function setReactor(state) {
   const centerRing = document.querySelector(".center");
   if (!centerRing) return;
@@ -92,42 +92,44 @@ function getApiKey() {
   return localStorage.getItem("jarvis_key") || localStorage.getItem("GEMINI_API_KEY") || null;
 }
 
-// --- 7. Local Hardware & Fast Commands (Immediate Response) ---
+// --- 7. Local Fast Hardware & Tool Commands ---
 function checkLocalCommand(cmd) {
   const clean = cmd.toLowerCase().trim();
 
-  // Instant local time
-  if (clean.includes("time") || clean === "what is the time" || clean === "what is the time now") {
+  // Time
+  if (clean.includes("time")) {
     const timeStr = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
     return `The current time is ${timeStr}, Boss.`;
   }
 
-  // Instant local date
+  // Date
   if (clean.includes("date today") || clean === "what is today" || clean === "date") {
     const dateStr = new Date().toLocaleDateString(undefined, { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
     return `Today is ${dateStr}, Boss.`;
   }
 
-  // Media Playback
-  if (clean.startsWith("play ") || clean.includes("play song") || clean.includes("play music")) {
-    const query = clean.replace(/play song|play music|play/gi, "").trim();
-    if (query) {
-      setTimeout(() => window.open(`https://www.youtube.com/results?search_query=${encodeURIComponent(query)}`, "_blank"), 1000);
-      return `Streaming "${query}" via YouTube, Boss.`;
-    }
+  // Flexible YouTube & Music Trigger
+  if (clean.includes("play ") || clean.includes("youtube") || clean.includes("song") || clean.includes("music")) {
+    let query = clean
+      .replace(/open youtube and play|open youtube|play music on|play song|play music|play/gi, "")
+      .trim();
+    if (!query) query = "trending music";
+    
+    setTimeout(() => window.open(`https://www.youtube.com/results?search_query=${encodeURIComponent(query)}`, "_blank"), 1000);
+    return `Streaming "${query}" via YouTube, Boss.`;
   }
 
   return null;
 }
 
-// --- 8. AI Uplink & Satellite Fallback ---
+// --- 8. AI Uplink with Failover & Timeout Protection ---
 async function askJarvis(promptText) {
   if (!promptText || promptText.trim() === "") return;
 
   add(`<span class="prefix">YOU:</span> ${promptText}`, "user");
   if (input) input.value = "";
 
-  // 1. Instant local fast command check
+  // 1. Check local fast-path commands first
   const localReply = checkLocalCommand(promptText);
   if (localReply) {
     add(`<span class="prefix">J.A.R.V.I.S:</span> ${localReply}`, 'ai');
@@ -144,48 +146,60 @@ async function askJarvis(promptText) {
   let finalReply = null;
   const key = getApiKey();
 
-  // Tier 1: Gemini Uplink
+  // Tier 1: Gemini API Call with 5-Second Timeout
   if (key) {
-    const models = ["gemini-1.5-flash", "gemini-2.0-flash", "gemini-flash-latest"];
-    for (const m of models) {
-      try {
-        const url = `https://generativelanguage.googleapis.com/v1beta/models/${m}:generateContent?key=${key}`;
-        const res = await fetch(url, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            contents: [{ role: "user", parts: [{ text: "You are J.A.R.V.I.S, addressing Tony Stark as Boss. Respond sharply in 1-2 sentences: " + promptText }] }]
-          })
-        });
-        const data = await res.json();
-        if (!data.error && data.candidates?.[0]?.content?.parts?.[0]?.text) {
-          finalReply = data.candidates[0].content.parts[0].text;
-          break;
-        }
-      } catch (err) {}
+    try {
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 5000);
+
+      const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${key}`;
+      const res = await fetch(url, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        signal: controller.signal,
+        body: JSON.stringify({
+          contents: [{ role: "user", parts: [{ text: "You are J.A.R.V.I.S. Respond sharply to Boss in 1-2 short sentences: " + promptText }] }]
+        })
+      });
+      clearTimeout(timeoutId);
+
+      const data = await res.json();
+      if (!data.error && data.candidates?.[0]?.content?.parts?.[0]?.text) {
+        finalReply = data.candidates[0].content.parts[0].text;
+      }
+    } catch (err) {
+      console.warn("Primary Gemini uplink timed out or failed. Routing to backup satellite...");
     }
   }
 
-  // Tier 2: Free Unlimited Public Satellite (Pollinations AI)
+  // Tier 2: Free Satellite Fallback (Pollinations AI)
   if (!finalReply) {
     try {
-      const fallbackUrl = `https://text.pollinations.ai/${encodeURIComponent(promptText)}?system=${encodeURIComponent("You are J.A.R.V.I.S. Respond sharply to Boss in 1-2 sentences.")}`;
-      const backupRes = await fetch(fallbackUrl);
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 6000);
+
+      const fallbackUrl = `https://text.pollinations.ai/${encodeURIComponent(promptText)}?system=${encodeURIComponent("You are J.A.R.V.I.S, Tony Stark's AI assistant. Address the user as Boss. Respond sharply and concisely in 1 to 2 sentences.")}`;
+      const backupRes = await fetch(fallbackUrl, { signal: controller.signal });
+      clearTimeout(timeoutId);
+
       if (backupRes.ok) {
         const text = await backupRes.text();
         if (text && text.trim().length > 0) finalReply = text.trim();
       }
-    } catch (err) {}
+    } catch (err) {
+      console.error("Backup satellite connection timed out:", err);
+    }
   }
 
+  // Update UI and Synthesize Speech
   if (finalReply) {
     chat.lastChild.innerHTML = `<span class="prefix">J.A.R.V.I.S:</span> ${finalReply}`;
     conversationHistory.push({ role: "model", parts: [{ text: finalReply }] });
     persistMemory();
     speak(finalReply);
   } else {
-    chat.lastChild.innerHTML = `<span class="prefix">J.A.R.V.I.S:</span> Uplink offline. Please check network.`;
-    speak("Uplink offline, Boss.");
+    chat.lastChild.innerHTML = `<span class="prefix">J.A.R.V.I.S:</span> Uplink offline or query timed out. Please try again.`;
+    speak("Uplink disrupted, Boss.");
     conversationHistory.pop();
   }
 

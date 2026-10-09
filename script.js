@@ -1,42 +1,89 @@
 // =========================================================================
-// J.A.R.V.I.S. SMART ASSISTANT - HOLOGRAPHIC MINI-SCREEN ENGINE
+// J.A.R.V.I.S. QUANTUM ENGINE v2.4 - DIRECT MEDIA & HUD RADAR CONTROLLER
 // =========================================================================
 
-// --- 1. Startup Key Check ---
-let API_KEY = localStorage.getItem('jarvis_key');
-if (!API_KEY) {
-  API_KEY = prompt('Enter your Gemini API Key:');
-  if (API_KEY) localStorage.setItem('jarvis_key', API_KEY.trim());
-}
-
-// --- 2. DOM Elements (Safe Fallback Selectors) ---
+// --- 1. DOM Elements ---
 const chat = document.getElementById("chat");
-const input = document.getElementById("msg") || document.getElementById("input");
-const sendBtn = document.getElementById("send") || document.getElementById("send-btn");
-const micBtn = document.getElementById("mic") || document.getElementById("mic-btn");
-const camBtn = document.getElementById("cam-btn") || document.getElementById("cam");
-const clearBtn = document.getElementById("clear-btn") || document.getElementById("clear");
-const imgInput = document.getElementById("camera-input") || document.getElementById("img-input");
+const input = document.getElementById("msg");
+const sendBtn = document.getElementById("send");
+const micBtn = document.getElementById("mic");
+const camBtn = document.getElementById("cam-btn");
+const clearBtn = document.getElementById("clear-btn");
+const imgInput = document.getElementById("camera-input");
 const holoScreen = document.getElementById("holo-screen");
 const holoTitle = document.getElementById("holo-title");
 const holoFrame = document.getElementById("holo-frame");
+const holoExternal = document.getElementById("holo-external");
+const reactorCenter = document.getElementById("reactor-center");
+const reactorLabel = document.getElementById("reactor-state-label");
+const liveClock = document.getElementById("live-clock");
+const batteryVal = document.getElementById("battery-val");
 
-// --- 3. Compact Memory ---
-let MEMORY = [];
-try {
-  const saved = localStorage.getItem("jarvis_memory");
-  if (saved) MEMORY = JSON.parse(saved).slice(-4);
-} catch (e) {
-  MEMORY = [];
+let currentExternalUrl = "";
+
+// --- 2. Real-Time Telemetry & Clock ---
+setInterval(() => {
+  if (liveClock) {
+    liveClock.innerText = new Date().toLocaleTimeString();
+  }
+}, 1000);
+
+if (navigator.getBattery) {
+  navigator.getBattery().then(battery => {
+    function updateBattery() {
+      if (batteryVal) {
+        const pct = Math.round(battery.level * 100);
+        const charging = battery.charging ? " [CHARGING]" : " [ONLINE]";
+        batteryVal.innerText = `${pct}\%${charging}`;
+      }
+    }
+    updateBattery();
+    battery.addEventListener("levelchange", updateBattery);
+    battery.addEventListener("chargingchange", updateBattery);
+  });
 }
 
-function saveMemory() {
+// --- 3. Audio Synth Effects & Arc Reactor HUD States ---
+const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+
+function playSynthTone(freq, type = "sine", duration = 0.1) {
   try {
-    localStorage.setItem("jarvis_memory", JSON.stringify(MEMORY.slice(-4)));
+    const osc = audioCtx.createOscillator();
+    const gain = audioCtx.createGain();
+    osc.type = type;
+    osc.frequency.setValueAtTime(freq, audioCtx.currentTime);
+    gain.gain.setValueAtTime(0.05, audioCtx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + duration);
+    osc.connect(gain);
+    gain.connect(audioCtx.destination);
+    osc.start();
+    osc.stop(audioCtx.currentTime + duration);
   } catch (e) {}
 }
 
-// --- 4. Chat Message Logger ---
+function setReactor(state) {
+  if (!reactorCenter || !reactorLabel) return;
+  if (state === "listening") {
+    reactorCenter.style.background = "#ff0055";
+    reactorCenter.style.boxShadow = "0 0 35px #ff0055";
+    reactorLabel.innerText = "SENSOR LISTENING";
+    playSynthTone(587, "triangle", 0.15);
+  } else if (state === "thinking") {
+    reactorCenter.style.background = "#ffaa00";
+    reactorCenter.style.boxShadow = "0 0 35px #ffaa00";
+    reactorLabel.innerText = "CALCULATING TELEMETRY";
+  } else if (state === "speaking") {
+    reactorCenter.style.background = "#00ffaa";
+    reactorCenter.style.boxShadow = "0 0 35px #00ffaa";
+    reactorLabel.innerText = "VOCAL TRANSMISSION";
+  } else {
+    reactorCenter.style.background = "#00f0ff";
+    reactorCenter.style.boxShadow = "0 0 30px #00f0ff";
+    reactorLabel.innerText = "ARC REACTOR ACTIVE";
+  }
+}
+
+// --- 4. Chat Logging ---
 function add(text, who) {
   if (!chat) return;
   const d = document.createElement("div");
@@ -46,118 +93,134 @@ function add(text, who) {
   chat.scrollTop = chat.scrollHeight;
 }
 
-// --- 5. Holographic Mini-Screen Controller ---
-function showMiniScreen(title, embedUrl) {
+// --- 5. Holographic Mini-Screen Control (Maps & HUD Radar) ---
+function showMiniScreen(title, embedUrl, externalUrl = null) {
   if (!holoScreen || !holoFrame) return;
-  if (holoTitle) holoTitle.innerText = title;
+  holoTitle.innerText = title;
   holoFrame.src = embedUrl;
+  currentExternalUrl = externalUrl || embedUrl;
   holoScreen.style.display = "block";
+  playSynthTone(880, "sine", 0.2);
 }
 
-// --- 6. Multilingual & Slang Speech Synthesizer ---
+function closeMiniScreen() {
+  if (holoScreen && holoFrame) {
+    holoFrame.src = "";
+    holoScreen.style.display = "none";
+  }
+}
+
+if (holoExternal) {
+  holoExternal.onclick = () => {
+    if (currentExternalUrl) window.open(currentExternalUrl, "_blank");
+  };
+}
+
+// --- 6. Adaptive Speech Synthesizer ---
 function speakMultilingual(text) {
   if (!("speechSynthesis" in window)) return;
   window.speechSynthesis.cancel();
 
-  // Strip HTML elements and formatting before speech
   const clean = text.replace(/<[^>]*>?/gm, "").replace(/[*#_`~]/g, "").trim();
   const utterance = new SpeechSynthesisUtterance(clean);
   utterance.rate = 1.08;
   utterance.pitch = 0.98;
 
-  const hasTeluguScript = /[\u0C00-\u0C7F]/.test(clean);
-  const hasHindiScript = /[\u0900-\u097F]/.test(clean);
+  const hasTelugu = /[\u0C00-\u0C7F]/.test(clean);
+  const hasHindi = /[\u0900-\u097F]/.test(clean);
 
   const voices = window.speechSynthesis.getVoices();
-  let selectedVoice = null;
+  let v = null;
+  if (hasTelugu) v = voices.find(vo => vo.lang.includes("te"));
+  else if (hasHindi) v = voices.find(vo => vo.lang.includes("hi"));
 
-  if (hasTeluguScript) {
-    selectedVoice = voices.find(v => v.lang.includes("te") || v.lang.includes("tel"));
-  } else if (hasHindiScript) {
-    selectedVoice = voices.find(v => v.lang.includes("hi") || v.lang.includes("hin"));
-  }
+  if (!v) v = voices.find(vo => vo.lang.includes("en-IN") || vo.lang.startsWith("en"));
+  if (v) utterance.voice = v;
 
-  if (!selectedVoice) {
-    selectedVoice = voices.find(v => v.lang.includes("en-IN") || v.lang.includes("en-GB") || v.lang.startsWith("en"));
-  }
+  utterance.onstart = () => setReactor("speaking");
+  utterance.onend = () => setReactor("idle");
+  utterance.onerror = () => setReactor("idle");
 
-  if (selectedVoice) utterance.voice = selectedVoice;
   window.speechSynthesis.speak(utterance);
 }
 
-// Audio unlock on user interaction
 window.addEventListener("touchstart", () => {
   if ("speechSynthesis" in window) {
     window.speechSynthesis.speak(new SpeechSynthesisUtterance(""));
   }
 }, { once: true });
 
-// --- 7. Fast Hardware & Media Router with Mini-Screen ---
+// --- 7. Fast Local Zero-Latency Command Center ---
 function runFastAction(cmd) {
   const clean = cmd.toLowerCase().trim();
 
-  // Clock
-  if (
-    clean.includes("time") || clean.includes("సమయం") || clean.includes("samayam") || 
-    clean.includes("समय") || clean.includes("samay") || clean.includes("time entha")
-  ) {
+  // Instant Time
+  if (clean.includes("time") || clean.includes("samayam") || clean.includes("samay") || clean.includes("సమయం")) {
     const time = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
     if (clean.includes("mama") || clean.includes("re")) return `Time ${time} aiyyindi mama!`;
     return `Current time is ${time}, Boss.`;
   }
 
-  // Calendar
-  if (
-    clean.includes("date") || clean.includes("తేదీ") || clean.includes("दिनांक") || 
-    clean.includes("tarikh") || clean.includes("e roju date")
-  ) {
+  // Instant Date
+  if (clean.includes("date") || clean.includes("today") || clean.includes("తేదీ") || clean.includes("tarikh")) {
     const date = new Date().toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' });
     return `Today's date is ${date}, Boss.`;
   }
 
-  // Music Queries (Embedded inside the Mini Screen)
-  const isMusicQuery = (
-    clean.includes("song") || clean.includes("songs") || clean.includes("paata") || 
-    clean.includes("paatalu") || clean.includes("gaana") || clean.includes("gaane") || 
-    clean.includes("play") || clean.includes("music") || clean.includes("bajao") || 
+  // Instant Music Direct Launch
+  const isMusic = (
+    clean.includes("song") || clean.includes("songs") || clean.includes("paata") ||
+    clean.includes("paatalu") || clean.includes("gaana") || clean.includes("gaane") ||
+    clean.includes("play") || clean.includes("music") || clean.includes("bajao") ||
     clean.includes("pettu") || clean.includes("chalao")
   );
 
-  if (isMusicQuery) {
+  if (isMusic) {
     let q = clean
       .replace(/\b(open|play|search|find|on|in|to|stream|listen|pettu|cheyyi|kavali|chalao|lagao|suno|bajao|re|mama|bro)\b/gi, "")
       .replace(/\b(youtube|spotify|music|song|songs|video|videos|paata|paatalu|gaana|gaane|పాట|పాటలు|गाने)\b/gi, "")
-      .trim() || "Telugu hit songs";
+      .trim() || "Trending Telugu songs";
 
-    const youtubeEmbed = `https://www.youtube.com/embed?listType=search&list=${encodeURIComponent(q)}&autoplay=1`;
-    showMiniScreen(`🎵 PLAYING: ${q.toUpperCase()}`, youtubeEmbed);
-    return `Playing "${q}" on your mini screen, Boss.`;
+    const targetUrl = `https://www.youtube.com/results?search_query=${encodeURIComponent(q)}`;
+
+    // Directly open in YouTube app or full tab without embedding blocks
+    setTimeout(() => {
+      const win = window.open(targetUrl, "_blank");
+      if (!win) window.location.href = targetUrl;
+    }, 250);
+
+    return `Playing "${q}" directly on YouTube, Boss. <a href="${targetUrl}" target="_blank" style="color:#00ffaa;text-decoration:underline;font-weight:bold;">Tap to open stream</a>.`;
   }
 
   return null;
 }
 
-// --- 8. Destination Extraction for Route Radar ---
-function checkRouteDestination(query) {
+// Destination Extraction
+function checkDestination(query) {
   const clean = query.toLowerCase().trim();
-  const routeWords = ["route", "way to reach", "how to reach", "directions", "distance", "dhaari", "velladaniki"];
-  if (routeWords.some(w => clean.includes(w))) {
-    let target = clean
+  const navTriggers = ["route", "way to reach", "how to reach", "directions", "distance", "dhaari", "velladaniki"];
+  if (navTriggers.some(t => clean.includes(t))) {
+    let dest = clean
       .replace(/\b(find|the|best|way|to|reach|how|route|directions|from|show|me|map|mama|bro|bhai|cheppu)\b/gi, "")
       .trim();
-    if (target.length > 2) return target;
+    if (dest.length > 2) return dest;
   }
   return null;
 }
 
-// --- 9. Multilingual Slang AI Engine ---
+// --- 8. Slang Chameleon Neural Brain (Gemini 2.0 Flash) ---
+let MEMORY = [];
+try {
+  const saved = localStorage.getItem("jarvis_memory");
+  if (saved) MEMORY = JSON.parse(saved).slice(-4);
+} catch (e) { MEMORY = []; }
+
 async function askJarvis(promptText) {
   if (!promptText || !promptText.trim()) return;
 
   add(`<span class="prefix">YOU:</span> ${promptText}`, "user");
   if (input) input.value = "";
 
-  // 1. Fast action check
   const localOutput = runFastAction(promptText);
   if (localOutput) {
     add(`<span class="prefix">J.A.R.V.I.S:</span> ${localOutput}`, "ai");
@@ -165,23 +228,25 @@ async function askJarvis(promptText) {
     return;
   }
 
-  // 2. Navigation check: Open Map Mini Screen immediately
-  const destination = checkRouteDestination(promptText);
+  const destination = checkDestination(promptText);
   if (destination) {
-    const mapEmbedUrl = `https://maps.google.com/maps?q=${encodeURIComponent(destination)}&t=&z=10&ie=UTF8&iwloc=&output=embed`;
-    showMiniScreen(`🛰️ ROUTE: ${destination.toUpperCase()}`, mapEmbedUrl);
+    const mapEmbed = `https://maps.google.com/maps?q=${encodeURIComponent(destination)}&t=&z=10&ie=UTF8&iwloc=&output=embed`;
+    const navDirect = `https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(destination)}`;
+    showMiniScreen(`🛰️ RADAR: ${destination.toUpperCase()}`, mapEmbed, navDirect);
   }
 
   add('<span class="prefix">J.A.R.V.I.S:</span> Computing telemetry...', 'ai');
+  setReactor("thinking");
 
   const key = localStorage.getItem("jarvis_key");
   let reply = null;
 
   const systemPrompt = `You are J.A.R.V.I.S, Tony Stark's personal AI assistant.
-CORE DIRECTIVES:
-1. SLANG DETECTION: Detect user dialect (Hyderabad/Telangana slang, Andhra mass Telugu, Bambaiya Hindi, or Tanglish/Hinglish) and respond in the EXACT SAME slang.
-2. If asked about routes or travel: Give key highways and route checkpoints in 1 to 2 sharp sentences.
-3. Keep it punchy, practical, and conversational.`;
+CORE SLANG MIRROR DIRECTIVE:
+- Detect the user's dialect (Hyderabad/Telangana slang, Andhra mass Telugu, Bambaiya Hindi, or Tanglish/Hinglish).
+- Reply in the EXACT SAME slang register and energy.
+- If asked about travel routes (e.g., Mancherial, Wanaparthy), state key highway numbers and approximate duration in 1 to 2 sharp sentences.
+- Keep answers punchy, natural, and limited to 2 sentences max.`;
 
   if (key) {
     try {
@@ -198,10 +263,7 @@ CORE DIRECTIVES:
         body: JSON.stringify({
           contents: contents,
           systemInstruction: { parts: [{ text: systemPrompt }] },
-          generationConfig: {
-            maxOutputTokens: 100,
-            temperature: 0.35
-          }
+          generationConfig: { maxOutputTokens: 90, temperature: 0.35 }
         })
       });
       clearTimeout(timeoutId);
@@ -210,12 +272,9 @@ CORE DIRECTIVES:
       if (data.candidates?.[0]?.content?.parts?.[0]?.text) {
         reply = data.candidates[0].content.parts[0].text.trim();
       }
-    } catch (e) {
-      console.warn("Primary endpoint skipped:", e);
-    }
+    } catch (e) {}
   }
 
-  // Backup Satellite
   if (!reply) {
     try {
       const fallbackUrl = `https://text.pollinations.ai/${encodeURIComponent(promptText)}?system=${encodeURIComponent(systemPrompt)}`;
@@ -228,14 +287,15 @@ CORE DIRECTIVES:
     chat.lastChild.innerHTML = `<span class="prefix">J.A.R.V.I.S:</span> ${reply}`;
     MEMORY.push({ role: "user", text: promptText });
     MEMORY.push({ role: "model", text: reply });
-    saveMemory();
+    try { localStorage.setItem("jarvis_memory", JSON.stringify(MEMORY.slice(-4))); } catch (e) {}
     speakMultilingual(reply);
   } else {
     chat.lastChild.innerHTML = `<span class="prefix">J.A.R.V.I.S:</span> Key needed. <a href="javascript:void(0)" onclick="let k=prompt('Paste Gemini Key:');if(k){localStorage.setItem('jarvis_key',k.trim());location.reload();}" style="color:#00ffaa;text-decoration:underline;">Tap here to enter key</a>.`;
+    setReactor("idle");
   }
 }
 
-// --- 10. Event Listeners ---
+// --- 9. Listeners & Controls ---
 if (sendBtn) {
   sendBtn.onclick = () => {
     const val = input ? input.value.trim() : "";
@@ -252,7 +312,7 @@ if (input) {
   });
 }
 
-// Multilingual Speech Recognition
+// Voice Recognition
 const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
 if (SR && micBtn) {
   const rec = new SR();
@@ -260,21 +320,21 @@ if (SR && micBtn) {
   rec.interimResults = false;
 
   micBtn.onclick = () => {
-    micBtn.innerText = "🔴";
+    setReactor("listening");
     rec.start();
   };
 
   rec.onresult = (e) => {
-    const text = e.results[0][0].transcript;
-    if (input) input.value = text;
-    askJarvis(text);
+    const t = e.results[0][0].transcript;
+    if (input) input.value = t;
+    askJarvis(t);
   };
 
-  rec.onend = () => { micBtn.innerText = "🎤"; };
-  rec.onerror = () => { micBtn.innerText = "🎤"; };
+  rec.onend = () => setReactor("idle");
+  rec.onerror = () => setReactor("idle");
 }
 
-// Camera Vision ("The Eyes")
+// Visual Sensor Telemetry
 if (camBtn && imgInput) {
   camBtn.onclick = () => imgInput.click();
 
@@ -282,8 +342,9 @@ if (camBtn && imgInput) {
     const file = imgInput.files[0];
     if (!file) return;
 
-    add('<span class="prefix">YOU:</span> [Photo Uploaded]', 'user');
-    add('<span class="prefix">J.A.R.V.I.S:</span> Scanning telemetry...', 'ai');
+    add('<span class="prefix">YOU:</span> [Optical Telemetry Uploaded]', 'user');
+    add('<span class="prefix">J.A.R.V.I.S:</span> Analyzing visual telemetry...', 'ai');
+    setReactor("thinking");
 
     const reader = new FileReader();
     reader.onload = async () => {
@@ -293,14 +354,13 @@ if (camBtn && imgInput) {
 
       if (key) {
         try {
-          const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${key}`;
-          const res = await fetch(url, {
+          const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${key}`, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
               contents: [{
                 parts: [
-                  { text: "Describe what you see in 1-2 sharp sentences matching user's friendly Indian slang." },
+                  { text: "Analyze telemetry. Respond in 1-2 sharp sentences matching user's Indian slang." },
                   { inline_data: { mime_type: file.type, data: base64 } }
                 ]
               }]
@@ -317,8 +377,9 @@ if (camBtn && imgInput) {
         chat.lastChild.innerHTML = `<span class="prefix">J.A.R.V.I.S:</span> ${reply}`;
         speakMultilingual(reply);
       } else {
-        chat.lastChild.innerHTML = `<span class="prefix">J.A.R.V.I.S:</span> Optical telemetry scan failed, Boss.`;
+        chat.lastChild.innerHTML = `<span class="prefix">J.A.R.V.I.S:</span> Visual scan failed, Boss.`;
       }
+      setReactor("idle");
     };
     reader.readAsDataURL(file);
   };
@@ -328,6 +389,7 @@ if (clearBtn) {
   clearBtn.onclick = () => {
     MEMORY = [];
     localStorage.removeItem("jarvis_memory");
-    add("SYSTEM: Memory cleared.", "ai");
+    add("SYSTEM: Memory core cleared.", "ai");
+    playSynthTone(440, "sine", 0.15);
   };
 }

@@ -1,5 +1,5 @@
 // =========================================================================
-// J.A.R.V.I.S. QUANTUM ENGINE v2.4 - COMPREHENSIVE PRODUCTION CONTROLLER
+// J.A.R.V.I.S. QUANTUM ENGINE v2.4 - GESTURE HANDOVER & NAVIGATION CONTROLLER
 // =========================================================================
 
 // --- 1. DOM Elements ---
@@ -93,13 +93,14 @@ function add(text, who) {
   chat.scrollTop = chat.scrollHeight;
 }
 
-// --- 5. Holographic Mini-Screen Control (Radar Maps) ---
+// --- 5. Holographic Mini-Screen Control ---
 function showMiniScreen(title, embedUrl, externalUrl = null) {
   if (!holoScreen || !holoFrame) return;
   holoTitle.innerText = title;
   holoFrame.src = embedUrl;
   currentExternalUrl = externalUrl || embedUrl;
   holoScreen.style.display = "block";
+  holoScreen.style.zIndex = "9999";
   playSynthTone(880, "sine", 0.2);
 }
 
@@ -116,7 +117,31 @@ if (holoExternal) {
   };
 }
 
-// --- 6. Adaptive Slang Speech Synthesizer ---
+// --- Double Tap Handover Gesture ---
+let lastTapTime = 0;
+if (holoScreen) {
+  holoScreen.ondblclick = () => {
+    if (currentExternalUrl) {
+      window.open(currentExternalUrl, "_blank");
+      playSynthTone(1046, "sine", 0.15);
+    }
+  };
+
+  holoScreen.addEventListener("touchend", (e) => {
+    const currentTime = new Date().getTime();
+    const tapLength = currentTime - lastTapTime;
+    if (tapLength < 350 && tapLength > 0) {
+      if (currentExternalUrl) {
+        window.open(currentExternalUrl, "_blank");
+        playSynthTone(1046, "sine", 0.15);
+      }
+      e.preventDefault();
+    }
+    lastTapTime = currentTime;
+  });
+}
+
+// --- 6. Adaptive Speech Synthesizer ---
 function speakMultilingual(text) {
   if (!("speechSynthesis" in window)) return;
   window.speechSynthesis.cancel();
@@ -150,7 +175,7 @@ window.addEventListener("touchstart", () => {
   }
 }, { once: true });
 
-// --- 7. Fast Local Command Center ---
+// --- 7. Fast Action & Route Extraction ---
 function runFastAction(cmd) {
   const clean = cmd.toLowerCase().trim();
 
@@ -167,7 +192,7 @@ function runFastAction(cmd) {
     return `Today's date is ${date}, Boss.`;
   }
 
-  // Instant Music Playback (Direct Unrestricted Playback)
+  // Instant Music Playback
   const isMusic = (
     clean.includes("song") || clean.includes("songs") || clean.includes("paata") ||
     clean.includes("paatalu") || clean.includes("gaana") || clean.includes("gaane") ||
@@ -179,29 +204,39 @@ function runFastAction(cmd) {
     let q = clean
       .replace(/\b(open|play|search|find|on|in|to|stream|listen|pettu|cheyyi|kavali|chalao|lagao|suno|bajao|re|mama|bro)\b/gi, "")
       .replace(/\b(youtube|spotify|music|song|songs|video|videos|paata|paatalu|gaana|gaane|పాట|పాటలు|गाने)\b/gi, "")
-      .trim() || "Trending Telugu songs";
+      .trim() || "Telugu hit songs";
 
     const targetUrl = `https://www.youtube.com/results?search_query=${encodeURIComponent(q)}`;
+
+    // Show preview and support double-tap app launch
+    showMiniScreen(`🎵 MEDIA: ${q.toUpperCase()}`, `https://www.youtube.com/embed?listType=search&list=${encodeURIComponent(q)}`, targetUrl);
 
     setTimeout(() => {
       const win = window.open(targetUrl, "_blank");
       if (!win) window.location.href = targetUrl;
     }, 250);
 
-    return `Playing "${q}" directly on YouTube, Boss. <a href="${targetUrl}" target="_blank" style="color:#00ffaa;text-decoration:underline;font-weight:bold;">Tap to stream</a>.`;
+    return `Playing "${q}" directly on YouTube, Boss. (Double tap mini screen to switch to app).`;
   }
 
   return null;
 }
 
-// Destination Extraction
+// Universal Route Intent Detector
 function checkDestination(query) {
   const clean = query.toLowerCase().trim();
-  const navTriggers = ["route", "way to reach", "how to reach", "directions", "distance", "dhaari", "velladaniki"];
+  const navTriggers = [
+    "navigate to", "navigate", "route to", "way to reach", 
+    "how to reach", "directions to", "directions", "distance to", 
+    "dhaari", "velladaniki", "vellu", "raasta", "reach"
+  ];
+
   if (navTriggers.some(t => clean.includes(t))) {
     let dest = clean
-      .replace(/\b(find|the|best|way|to|reach|how|route|directions|from|show|me|map|mama|bro|bhai|cheppu)\b/gi, "")
+      .replace(/\b(navigate to|navigate|find|the|best|way|to|reach|how|route|directions|from|show|me|map|dhaari|velladaniki|vellu|raasta)\b/gi, "")
+      .replace(/\b(vinay|jarvis|hey|hi|mama|bro|bhai|cheppu|batao|please)\b/gi, "")
       .trim();
+
     if (dest.length > 2) return dest;
   }
   return null;
@@ -229,7 +264,7 @@ async function askJarvis(promptText) {
 
   const destination = checkDestination(promptText);
   if (destination) {
-    const mapEmbed = `https://maps.google.com/maps?q=${encodeURIComponent(destination)}&t=&z=10&ie=UTF8&iwloc=&output=embed`;
+    const mapEmbed = `https://maps.google.com/maps?q=${encodeURIComponent(destination)}&t=&z=11&ie=UTF8&iwloc=&output=embed`;
     const navDirect = `https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(destination)}`;
     showMiniScreen(`🛰️ RADAR: ${destination.toUpperCase()}`, mapEmbed, navDirect);
   }
@@ -311,7 +346,7 @@ if (input) {
   });
 }
 
-// Multilingual Speech Recognition
+// Voice Recognition
 const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
 if (SR && micBtn) {
   const rec = new SR();

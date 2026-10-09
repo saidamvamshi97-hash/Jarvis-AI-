@@ -1,5 +1,5 @@
 // =========================================================================
-// J.A.R.V.I.S. MOBILE ASSISTANT - ADVANCED VOICE MEDIA & AUTONOMOUS ENGINE
+// J.A.R.V.I.S. MOBILE ASSISTANT - BULLETPROOF CONTROLLER (EPISODE 05-07)
 // =========================================================================
 
 // --- 1. DOM Elements ---
@@ -63,7 +63,8 @@ function speak(text) {
   if (!("speechSynthesis" in window)) return;
   window.speechSynthesis.cancel();
 
-  const clean = text.replace(/[*#_`~]/g, "").trim();
+  // Strip HTML tags and markdown symbols before speaking aloud
+  const clean = text.replace(/<[^>]*>?/gm, "").replace(/[*#_`~]/g, "").trim();
   const utterance = new SpeechSynthesisUtterance(clean);
   utterance.lang = "en-US";
   utterance.rate = 1.05;
@@ -92,7 +93,7 @@ function getApiKey() {
   return localStorage.getItem("jarvis_key") || localStorage.getItem("GEMINI_API_KEY") || null;
 }
 
-// --- 7. SPECIALIZED VOICE SONG & HARDWARE ROUTER ---
+// --- 7. SPECIALIZED VOICE SONG & LOCAL HARDWARE ROUTER ---
 function checkLocalCommand(cmd) {
   const clean = cmd.toLowerCase().trim();
 
@@ -109,58 +110,32 @@ function checkLocalCommand(cmd) {
   }
 
   // ----------------------------------------------------
-  // ADVANCED VOICE SONG & MEDIA SEARCH ENGINE
+  // BULLETPROOF YOUTUBE & MUSIC ROUTER
   // ----------------------------------------------------
-  const songKeywords = [
-    "play", "song", "songs", "music", "track", "audio", "listen",
-    "youtube", "spotify", "jiosaavn", "gaana", "wynk"
-  ];
-  const isMediaRequest = songKeywords.some(kw => clean.includes(kw));
-
-  if (isMediaRequest) {
-    // 1. Detect target service
-    let platform = "YouTube";
-    let targetUrl = "";
-
-    // Clean out trigger boilerplate words
-    let searchPhrase = clean
-      .replace(/open youtube and play|open youtube|play on youtube|play in youtube/gi, "")
-      .replace(/play on spotify|open spotify/gi, "")
-      .replace(/play on jiosaavn|open jiosaavn/gi, "")
-      .replace(/play music on|play song on|play song|play songs|play music|play audio|play track|play/gi, "")
-      .replace(/listen to|stream|put on|sing|search song|search music|find song/gi, "")
+  if (
+    clean.includes("youtube") || 
+    clean.includes("song") || 
+    clean.includes("songs") || 
+    clean.includes("play") || 
+    clean.includes("music")
+  ) {
+    // Strip common filler words regardless of placement in the sentence
+    let query = clean
+      .replace(/\b(open|play|search|find|on|in|to|stream|listen)\b/gi, "")
+      .replace(/\b(youtube|spotify|music|song|songs|video|videos)\b/gi, "")
       .trim();
 
-    if (!searchPhrase) searchPhrase = "Top Trending Telugu Songs";
+    if (!query) query = "Telugu hit songs";
 
-    // Spotify routing
-    if (clean.includes("spotify")) {
-      platform = "Spotify";
-      targetUrl = `https://open.spotify.com/search/${encodeURIComponent(searchPhrase)}`;
-    }
-    // JioSaavn routing
-    else if (clean.includes("jiosaavn") || clean.includes("saavn")) {
-      platform = "JioSaavn";
-      targetUrl = `https://www.jiosaavn.com/search/${encodeURIComponent(searchPhrase)}`;
-    }
-    // YouTube Music routing
-    else if (clean.includes("yt music") || clean.includes("youtube music")) {
-      platform = "YouTube Music";
-      targetUrl = `https://music.youtube.com/search?q=${encodeURIComponent(searchPhrase)}`;
-    }
-    // Default: YouTube Search
-    else {
-      platform = "YouTube";
-      targetUrl = `https://www.youtube.com/results?search_query=${encodeURIComponent(searchPhrase)}`;
-    }
+    const targetUrl = `https://www.youtube.com/results?search_query=${encodeURIComponent(query)}`;
 
-    // Launch streaming link safely
+    // Open immediately to bypass Android popup blockers
     setTimeout(() => {
       const win = window.open(targetUrl, "_blank");
       if (!win) window.location.href = targetUrl;
-    }, 350);
+    }, 250);
 
-    return `Streaming "${searchPhrase}" via ${platform}, Boss.`;
+    return `Streaming "${query}" on YouTube, Boss. If it did not open automatically, <a href="${targetUrl}" target="_blank" style="color:#00ffaa;text-decoration:underline;font-weight:bold;">tap here to launch</a>.`;
   }
 
   return null;
@@ -173,7 +148,7 @@ async function askJarvis(promptText) {
   add(`<span class="prefix">YOU:</span> ${promptText}`, "user");
   if (input) input.value = "";
 
-  // 1. Check local fast-path commands and specialized song router first
+  // 1. Check local fast-path commands and music router first
   const localReply = checkLocalCommand(promptText);
   if (localReply) {
     add(`<span class="prefix">J.A.R.V.I.S:</span> ${localReply}`, 'ai');
@@ -364,4 +339,4 @@ if (SpeechRecognition && micBtn) {
     micBtn.innerText = "🎤";
     setReactor("idle");
   };
-}
+        }

@@ -1,347 +1,309 @@
+ // =========================================================================
+// J.A.R.V.I.S. MOBILE ASSISTANT - BULLETPROOF CONTROLLER (EPISODE 05-07)
 // =========================================================================
-// J.A.R.V.I.S. MOBILE ASSISTANT - EPISODE 07: AUTONOMOUS AGENT BRAIN
-// =========================================================================
 
-// ===== 1. API KEY & SMART MODEL FALLBACKS =====
-let API_KEY = localStorage.getItem('jarvis_key');
-if (!API_KEY) {
-  API_KEY = prompt('Enter your Gemini API Key (or leave empty for backup satellite):');
-  if (API_KEY) localStorage.setItem('jarvis_key', API_KEY);
+// --- 1. DOM Elements (Safe Dual-ID Fallback Selector) ---
+const chat = document.getElementById("chat");
+const input = document.getElementById("msg") || document.getElementById("input");
+const sendBtn = document.getElementById("send") || document.getElementById("send-btn");
+const micBtn = document.getElementById("mic") || document.getElementById("mic-btn");
+const camBtn = document.getElementById("cam-btn") || document.getElementById("cam");
+const clearBtn = document.getElementById("clear-btn") || document.getElementById("clear");
+const imgInput = document.getElementById("img-input") || document.getElementById("camera-input");
+const arcCore = document.getElementById("arc-core") || document.querySelector(".center");
+const batteryRow = document.getElementById("battery-row");
+
+// --- 2. State & Long-Term Memory ---
+let conversationHistory = [];
+try {
+  const saved = localStorage.getItem("jarvis_memory");
+  if (saved) conversationHistory = JSON.parse(saved);
+} catch (e) {
+  conversationHistory = [];
 }
 
-const MODELS = ["gemini-1.5-flash", "gemini-2.0-flash", "gemini-flash-latest"];
-
-// ===== 2. PERSISTENT LONG-TERM MEMORY =====
-let MEMORY = JSON.parse(localStorage.getItem('jarvis_memory') || '[]');
-
-function saveMemory() {
-  localStorage.setItem('jarvis_memory', JSON.stringify(MEMORY.slice(-12)));
-}
-
-const chat = document.getElementById('chat');
-const input = document.getElementById('msg');
-const micBtn = document.getElementById('mic-btn') || document.getElementById('mic');
-const clearBtn = document.getElementById('clear-btn');
-const camBtn = document.getElementById('cam-btn');
-const imgInput = document.getElementById('img-input');
-
-// Render saved conversation on start
-if (chat) {
-  MEMORY.forEach(m => add((m.role === 'user' ? 'YOU: ' : 'J.A.R.V.I.S: ') + m.text, m.role === 'user' ? 'user' : 'ai'));
-}
-
-if (clearBtn) {
-  clearBtn.onclick = () => {
-    MEMORY = [];
-    saveMemory();
-    chat.innerHTML = '';
-    add('SYSTEM: Long-term memory wiped, Boss.', 'ai');
-    speak('Long term memory cleared, Boss.');
-  };
-}
-
-// ===== 3. AUTONOMOUS TOOLS REGISTRY =====
-let activeTimer = null;
-
-const TOOLS = {
-  async getTime() {
-    return new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-  },
-
-  async getDate() {
-    return new Date().toLocaleDateString(undefined, { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
-  },
-
-  async getWeather() {
-    return new Promise((resolve) => {
-      if (!navigator.geolocation) return resolve("Weather telemetry unavailable: No geolocation support.");
-      navigator.geolocation.getCurrentPosition(async (pos) => {
-        try {
-          const { latitude, longitude } = pos.coords;
-          const res = await fetch(`https://api.open-meteo.com/v1/forecast?latitude=${latitude}&longitude=${longitude}&current_weather=true`);
-          const data = await res.json();
-          if (data && data.current_weather) {
-            resolve(`${Math.round(data.current_weather.temperature)}°C, Wind speed:${data.current_weather.windspeed} km/h`);
-          } else {
-            resolve("Sunny and 28°C");
-          }
-        } catch (e) {
-          resolve("28°C with clear skies");
-        }
-      }, () => resolve("Clear skies, 28°C"));
-    });
-  },
-
-  async getNews() {
-    try {
-      const res = await fetch("https://hacker-news.firebaseio.com/v0/topstories.json");
-      const ids = await res.json();
-      const topStoryRes = await fetch(`https://hacker-news.firebaseio.com/v0/item/${ids[0]}.json`);       const story = await topStoryRes.json();       return story.title \vert{}\vert{} "AI advancements accelerating globally";     } catch (e) {       return "Global markets and technology sectors reporting steady growth";     }   },    async getCrypto(coin = "bitcoin") {     try {       const res = await fetch(`https://api.coingecko.com/api/v3/simple/price?ids=${coin}&vs_currencies=usd,inr`);
-      const data = await res.json();
-      if (data && data[coin]) {
-        return `${coin.toUpperCase()}:$${data[coin].usd.toLocaleString()} (₹${data[coin].inr.toLocaleString()})`;       }     } catch (e) {}     return `${coin.toUpperCase()} trading steady`;
-  }
-};
-
-// ===== 4. EPISODE 07: AGENT PLANNING & EXECUTION LOOP =====
-async function runAgent(goalText) {
-  add('J.A.R.V.I.S: [AGENT MODE ACTIVATED]', 'ai');
-  add('J.A.R.V.I.S: Devising execution plan...', 'ai');
-
-  // Step 1: Think (Ask Brain to output structured JSON tool plan)
-  const agentPrompt = `
-You are the autonomous executive brain of J.A.R.V.I.S.
-Goal: "${goalText}"
-
-Available tools:
-- "time": Current time
-- "date": Today's date
-- "weather": Current atmospheric weather
-- "news": Latest top headline
-- "crypto": Live Bitcoin price
-
-Respond ONLY with a JSON array of tool names needed to fulfill this goal.
-Example: ["time", "weather", "news"]
-If no tools are required, respond: []
-`;
-
-  let toolsToRun = [];
+function persistMemory() {
   try {
-    const planResponse = await callGemini(agentPrompt);
-    const jsonMatch = planResponse.match(/\[.*?\]/s);
-    if (jsonMatch) {
-      toolsToRun = JSON.parse(jsonMatch[0]);
-    }
-  } catch (err) {
-    // Default fallback plan for briefings
-    if (goalText.toLowerCase().includes("briefing")) {
-      toolsToRun = ["time", "weather", "news"];
-    }
-  }
+    localStorage.setItem("jarvis_memory", JSON.stringify(conversationHistory.slice(-10)));
+  } catch (e) {}
+}
 
-  // Step 2 & 3: Act and Observe
-  let observations = [];
-  for (const toolName of toolsToRun) {
-    add(`AGENT: Executing tool [${toolName}]...`, 'ai');
-    let obs = "";
-    if (toolName === "time") obs = "Time: " + (await TOOLS.getTime());
-    else if (toolName === "date") obs = "Date: " + (await TOOLS.getDate());
-    else if (toolName === "weather") obs = "Atmosphere: " + (await TOOLS.getWeather());
-    else if (toolName === "news") obs = "Headline: " + (await TOOLS.getNews());
-    else if (toolName === "crypto") obs = "Crypto: " + (await TOOLS.getCrypto("bitcoin"));
-    
-    if (obs) observations.push(obs);
-  }
+// --- 3. Reactive Arc Reactor Visuals ---
+function setReactor(state) {
+  const centerRing = document.querySelector(".center");
+  if (!centerRing) return;
 
-  // Step 4: Final Synthesis & Spoken Briefing
-  add('J.A.R.V.I.S: Synthesizing executive briefing...', 'ai');
-  const synthesisPrompt = `
-You are J.A.R.V.I.S. Address Boss directly.
-The user wanted: "${goalText}"
-Observed telemetry data:
-${observations.join('\n')}
-
-Synthesize these observations into a sharp, confident 2 to 3 sentence spoken briefing for Boss.
-`;
-
-  try {
-    const finalReport = await callGemini(synthesisPrompt);
-    MEMORY.push({ role: 'user', text: goalText });
-    MEMORY.push({ role: 'model', text: finalReport });
-    saveMemory();
-    chat.lastChild.innerText = 'J.A.R.V.I.S: ' + finalReport;
-    speak(finalReport);
-  } catch (err) {
-    const fallbackBrief = `All systems online, Boss. ${observations.join('. ')}.`;
-    chat.lastChild.innerText = 'J.A.R.V.I.S: ' + fallbackBrief;
-    speak(fallbackBrief);
+  if (state === "listening") {
+    centerRing.style.background = "#ff0055";
+    centerRing.style.boxShadow = "0 0 35px #ff0055";
+  } else if (state === "thinking") {
+    centerRing.style.background = "#ffaa00";
+    centerRing.style.boxShadow = "0 0 35px #ffaa00";
+  } else if (state === "speaking") {
+    centerRing.style.background = "#00ffaa";
+    centerRing.style.boxShadow = "0 0 35px #00ffaa";
+  } else {
+    centerRing.style.background = "#00e5ff";
+    centerRing.style.boxShadow = "0 0 35px #00e5ff";
   }
 }
 
-// ===== 5. GEMINI BRAIN & SATELLITE FAILOVER =====
-async function callGemini(p) {
-  const contents = MEMORY.slice(-12).map(m => ({ role: m.role, parts: [{ text: m.text }] }));
-  contents.push({ role: 'user', parts: [{ text: p }] });
+// --- 4. Chat Message Appender ---
+function add(text, who) {
+  if (!chat) return;
+  const d = document.createElement("div");
+  d.className = "msg " + who;
+  d.innerHTML = text;
+  chat.appendChild(d);
+  chat.scrollTop = chat.scrollHeight;
+}
 
-  let lastErr;
+// --- 5. Mobile Speech Synthesis ---
+function speak(text) {
+  if (!("speechSynthesis" in window)) return;
+  window.speechSynthesis.cancel();
 
-  if (API_KEY) {
-    for (const m of MODELS) {
-      try {
-        const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${m}:generateContent?key=${API_KEY}`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ contents: contents })
-        });
-        const data = await res.json();
-        if (data.error) {
-          lastErr = new Error(data.error.message);
-          if (/high demand|temporar|quota|rate|unavailable|deprecated/i.test(data.error.message)) continue;
-          throw lastErr;
-        }
-        return data.candidates[0].content.parts[0].text;
-      } catch (e) {
-        lastErr = e;
-      }
+  const clean = text.replace(/[*#_`~]/g, "").trim();
+  const utterance = new SpeechSynthesisUtterance(clean);
+  utterance.lang = "en-US";
+  utterance.rate = 1.05;
+  utterance.pitch = 0.95;
+
+  const voices = window.speechSynthesis.getVoices();
+  const enVoice = voices.find(v => v.lang.startsWith("en-GB") || v.lang.startsWith("en-US") || v.lang.startsWith("en"));
+  if (enVoice) utterance.voice = enVoice;
+
+  utterance.onstart = () => setReactor("speaking");
+  utterance.onend = () => setReactor("idle");
+  utterance.onerror = () => setReactor("idle");
+
+  window.speechSynthesis.speak(utterance);
+}
+
+// Pre-unlock speech synthesizer on touch
+window.addEventListener("touchstart", () => {
+  if ("speechSynthesis" in window) {
+    window.speechSynthesis.speak(new SpeechSynthesisUtterance(""));
+  }
+}, { once: true });
+
+// --- 6. API Key Manager ---
+function getApiKey() {
+  return localStorage.getItem("jarvis_key") || localStorage.getItem("GEMINI_API_KEY") || null;
+}
+
+// --- 7. Local Hardware & Fast Commands (Immediate Response) ---
+function checkLocalCommand(cmd) {
+  const clean = cmd.toLowerCase().trim();
+
+  // Instant local time
+  if (clean.includes("time") || clean === "what is the time" || clean === "what is the time now") {
+    const timeStr = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+    return `The current time is ${timeStr}, Boss.`;
+  }
+
+  // Instant local date
+  if (clean.includes("date today") || clean === "what is today" || clean === "date") {
+    const dateStr = new Date().toLocaleDateString(undefined, { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
+    return `Today is ${dateStr}, Boss.`;
+  }
+
+  // Media Playback
+  if (clean.startsWith("play ") || clean.includes("play song") || clean.includes("play music")) {
+    const query = clean.replace(/play song|play music|play/gi, "").trim();
+    if (query) {
+      setTimeout(() => window.open(`https://www.youtube.com/results?search_query=${encodeURIComponent(query)}`, "_blank"), 1000);
+      return `Streaming "${query}" via YouTube, Boss.`;
     }
   }
 
-  // Secondary Fallback: Free Keyless Satellite
-  try {
-    const backup = await fetch(`https://text.pollinations.ai/${encodeURIComponent(p)}?system=${encodeURIComponent("You are J.A.R.V.I.S, Tony Stark's AI. Respond sharply and concisely to Boss in 1-2 sentences.")}`);
-    if (backup.ok) {
-      const text = await backup.text();
-      if (text && text.trim().length > 0) return text.trim();
-    }
-  } catch (err) {}
-
-  throw lastErr || new Error("All network uplinks offline.");
+  return null;
 }
 
-async function askGemini(p) {
-  const q = p.toLowerCase().trim();
+// --- 8. AI Uplink & Satellite Fallback ---
+async function askJarvis(promptText) {
+  if (!promptText || promptText.trim() === "") return;
 
-  // Check Agent Triggers (Episode 07)
-  if (q.includes("briefing") || q.startsWith("plan ") || q.includes("research ") || q.includes("analyze ")) {
-    await runAgent(p);
+  add(`<span class="prefix">YOU:</span> ${promptText}`, "user");
+  if (input) input.value = "";
+
+  // 1. Instant local fast command check
+  const localReply = checkLocalCommand(promptText);
+  if (localReply) {
+    add(`<span class="prefix">J.A.R.V.I.S:</span> ${localReply}`, 'ai');
+    speak(localReply);
     return;
   }
 
-  // Fallback to standard chat response
-  add('J.A.R.V.I.S: Thinking...', 'ai');
-  try {
-    const reply = await callGemini(p);
-    MEMORY.push({ role: 'user', text: p });
-    MEMORY.push({ role: 'model', text: reply });
-    saveMemory();
-    chat.lastChild.innerText = 'J.A.R.V.I.S: ' + reply;
-    speak(reply);
-  } catch (e) {
-    chat.lastChild.innerText = 'J.A.R.V.I.S: ERROR ' + e.message;
+  add('<span class="prefix">J.A.R.V.I.S:</span> Thinking...', 'ai');
+  setReactor("thinking");
+
+  conversationHistory.push({ role: "user", parts: [{ text: promptText }] });
+  if (conversationHistory.length > 6) conversationHistory = conversationHistory.slice(-6);
+
+  let finalReply = null;
+  const key = getApiKey();
+
+  // Tier 1: Gemini Uplink
+  if (key) {
+    const models = ["gemini-1.5-flash", "gemini-2.0-flash", "gemini-flash-latest"];
+    for (const m of models) {
+      try {
+        const url = `https://generativelanguage.googleapis.com/v1beta/models/${m}:generateContent?key=${key}`;
+        const res = await fetch(url, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            contents: [{ role: "user", parts: [{ text: "You are J.A.R.V.I.S, addressing Tony Stark as Boss. Respond sharply in 1-2 sentences: " + promptText }] }]
+          })
+        });
+        const data = await res.json();
+        if (!data.error && data.candidates?.[0]?.content?.parts?.[0]?.text) {
+          finalReply = data.candidates[0].content.parts[0].text;
+          break;
+        }
+      } catch (err) {}
+    }
   }
+
+  // Tier 2: Free Unlimited Public Satellite (Pollinations AI)
+  if (!finalReply) {
+    try {
+      const fallbackUrl = `https://text.pollinations.ai/${encodeURIComponent(promptText)}?system=${encodeURIComponent("You are J.A.R.V.I.S. Respond sharply to Boss in 1-2 sentences.")}`;
+      const backupRes = await fetch(fallbackUrl);
+      if (backupRes.ok) {
+        const text = await backupRes.text();
+        if (text && text.trim().length > 0) finalReply = text.trim();
+      }
+    } catch (err) {}
+  }
+
+  if (finalReply) {
+    chat.lastChild.innerHTML = `<span class="prefix">J.A.R.V.I.S:</span> ${finalReply}`;
+    conversationHistory.push({ role: "model", parts: [{ text: finalReply }] });
+    persistMemory();
+    speak(finalReply);
+  } else {
+    chat.lastChild.innerHTML = `<span class="prefix">J.A.R.V.I.S:</span> Uplink offline. Please check network.`;
+    speak("Uplink offline, Boss.");
+    conversationHistory.pop();
+  }
+
+  setReactor("idle");
 }
 
-// ===== 6. VISION ENGINE ("THE EYES") =====
+// --- 9. SEND & KEYBOARD LISTENERS ---
+if (sendBtn) {
+  sendBtn.onclick = () => {
+    const val = input ? input.value.trim() : "";
+    if (val) askJarvis(val);
+  };
+}
+
+if (input) {
+  input.addEventListener("keydown", (e) => {
+    if (e.key === "Enter") {
+      const val = input.value.trim();
+      if (val) askJarvis(val);
+    }
+  });
+}
+
+// --- 10. CLEAR MEMORY BUTTON ---
+if (clearBtn) {
+  clearBtn.onclick = () => {
+    conversationHistory = [];
+    localStorage.removeItem("jarvis_memory");
+    add('<span class="prefix">SYSTEM:</span> Memory wiped clean, Boss.', 'ai');
+    speak("Memory cleared, Boss.");
+  };
+}
+
+// --- 11. CAMERA VISION ("THE EYES") ---
 if (camBtn && imgInput) {
   camBtn.onclick = () => imgInput.click();
+
   imgInput.onchange = () => {
     const file = imgInput.files[0];
     if (!file) return;
 
+    add('<span class="prefix">YOU:</span> [Photo Telemetry Uploaded]', 'user');
+    add('<span class="prefix">J.A.R.V.I.S:</span> Analyzing visual telemetry...', 'ai');
+    setReactor("thinking");
+
     const reader = new FileReader();
-    reader.onload = () => {
+    reader.onload = async () => {
       const base64 = reader.result.split(',')[1];
-      const q = input.value.trim() || 'What do you see? Describe briefly.';
-      add('YOU: [IMAGE] ' + q, 'user');
-      input.value = '';
-      askVision(base64, file.type, q);
+      const key = getApiKey();
+      let reply = null;
+
+      if (key) {
+        try {
+          const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${key}`;
+          const res = await fetch(url, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              contents: [{
+                parts: [
+                  { text: "Describe what you see in 1-2 sharp sentences addressing Boss:" },
+                  { inline_data: { mime_type: file.type, data: base64 } }
+                ]
+              }]
+            })
+          });
+          const data = await res.json();
+          if (data.candidates?.[0]?.content?.parts?.[0]?.text) {
+            reply = data.candidates[0].content.parts[0].text;
+          }
+        } catch (e) {}
+      }
+
+      if (reply) {
+        chat.lastChild.innerHTML = `<span class="prefix">J.A.R.V.I.S:</span> ${reply}`;
+        speak(reply);
+      } else {
+        chat.lastChild.innerHTML = `<span class="prefix">J.A.R.V.I.S:</span> Visual optical feed failed to process, Boss.`;
+        speak("Vision scan failed, Boss.");
+      }
+      setReactor("idle");
     };
     reader.readAsDataURL(file);
   };
 }
 
-async function askVision(base64, mime, q) {
-  add('J.A.R.V.I.S: Analyzing visual stream...', 'ai');
-  let lastErr;
+// --- 12. SPEECH RECOGNITION (MIC) ---
+const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+if (SpeechRecognition && micBtn) {
+  const rec = new SpeechRecognition();
+  rec.lang = "en-US";
+  rec.interimResults = false;
 
-  if (API_KEY) {
-    for (const m of MODELS) {
-      try {
-        const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${m}:generateContent?key=${API_KEY}`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            contents: [{
-              parts: [
-                { text: q },
-                { inline_data: { mime_type: mime, data: base64 } }
-              ]
-            }]
-          })
-        });
-        const data = await res.json();
-        if (data.error) {
-          lastErr = new Error(data.error.message);
-          if (/high demand|temporar|quota|rate|unavailable|deprecated/i.test(data.error.message)) continue;
-          throw lastErr;
-        }
-        const reply = data.candidates[0].content.parts[0].text;
-        chat.lastChild.innerText = 'J.A.R.V.I.S: ' + reply;
-        speak(reply);
-        return;
-      } catch (e) {
-        lastErr = e;
-      }
-    }
-  }
-
-  chat.lastChild.innerText = 'J.A.R.V.I.S: ERROR ' + (lastErr ? lastErr.message : "Vision uplink offline.");
-}
-
-// ===== 7. SPEECH RECOGNITION & UTILS =====
-const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
-if (SR && micBtn) {
-  const rec = new SR();
-  rec.lang = 'en-US';
-  rec.onresult = (e) => {
-    const t = e.results[0][0].transcript;
-    add('YOU: ' + t, 'user');
-    askGemini(t);
-  };
   micBtn.onclick = () => {
-    rec.start();
-    micBtn.innerText = 'LISTENING...';
-  };
-  rec.onend = () => {
-    micBtn.innerText = '🎤';
-  };
-}
-
-let voices = [];
-function loadVoices() {
-  voices = speechSynthesis.getVoices();
-}
-loadVoices();
-speechSynthesis.onvoiceschanged = loadVoices;
-
-function speak(t) {
-  window.speechSynthesis.cancel();
-  const u = new SpeechSynthesisUtterance(t.replace(/[*#_`~]/g, ""));
-  u.rate = 1.05;
-  u.pitch = 0.85;
-  const v = voices.find(v => v.lang.startsWith('en'));
-  if (v) u.voice = v;
-  speechSynthesis.speak(u);
-}
-
-const sendBtn = document.getElementById('send');
-if (sendBtn) {
-  sendBtn.onclick = () => {
-    const t = input.value.trim();
-    if (!t) return;
-    add('YOU: ' + t, 'user');
-    input.value = '';
-    askGemini(t);
-  };
-}
-
-if (input) {
-  input.addEventListener('keydown', (e) => {
-    if (e.key === 'Enter') {
-      const t = input.value.trim();
-      if (!t) return;
-      add('YOU: ' + t, 'user');
-      input.value = '';
-      askGemini(t);
+    try {
+      setReactor("listening");
+      micBtn.innerText = "🔴";
+      rec.start();
+    } catch (e) {
+      rec.stop();
+      micBtn.innerText = "🎤";
+      setReactor("idle");
     }
-  });
-}
+  };
 
-function add(t, w) {
-  if (!chat) return;
-  const d = document.createElement('div');
-  d.className = 'msg ' + w;
-  d.innerText = t;
-  chat.appendChild(d);
-  chat.scrollTop = chat.scrollHeight;
+  rec.onresult = (e) => {
+    const transcript = e.results[0][0].transcript;
+    if (input) input.value = transcript;
+    askJarvis(transcript);
+  };
+
+  rec.onend = () => {
+    micBtn.innerText = "🎤";
+    setReactor("idle");
+  };
+
+  rec.onerror = () => {
+    micBtn.innerText = "🎤";
+    setReactor("idle");
+  };
 }

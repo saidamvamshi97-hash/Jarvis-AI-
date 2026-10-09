@@ -1,5 +1,5 @@
 // =========================================================================
-// J.A.R.V.I.S. QUANTUM ENGINE v2.4 - DIRECT MEDIA & HUD RADAR CONTROLLER
+// J.A.R.V.I.S. QUANTUM ENGINE v2.4 - COMPREHENSIVE PRODUCTION CONTROLLER
 // =========================================================================
 
 // --- 1. DOM Elements ---
@@ -83,7 +83,7 @@ function setReactor(state) {
   }
 }
 
-// --- 4. Chat Logging ---
+// --- 4. Chat Message Appender ---
 function add(text, who) {
   if (!chat) return;
   const d = document.createElement("div");
@@ -93,7 +93,7 @@ function add(text, who) {
   chat.scrollTop = chat.scrollHeight;
 }
 
-// --- 5. Holographic Mini-Screen Control (Maps & HUD Radar) ---
+// --- 5. Holographic Mini-Screen Control (Radar Maps) ---
 function showMiniScreen(title, embedUrl, externalUrl = null) {
   if (!holoScreen || !holoFrame) return;
   holoTitle.innerText = title;
@@ -116,7 +116,7 @@ if (holoExternal) {
   };
 }
 
-// --- 6. Adaptive Speech Synthesizer ---
+// --- 6. Adaptive Slang Speech Synthesizer ---
 function speakMultilingual(text) {
   if (!("speechSynthesis" in window)) return;
   window.speechSynthesis.cancel();
@@ -150,7 +150,7 @@ window.addEventListener("touchstart", () => {
   }
 }, { once: true });
 
-// --- 7. Fast Local Zero-Latency Command Center ---
+// --- 7. Fast Local Command Center ---
 function runFastAction(cmd) {
   const clean = cmd.toLowerCase().trim();
 
@@ -167,7 +167,7 @@ function runFastAction(cmd) {
     return `Today's date is ${date}, Boss.`;
   }
 
-  // Instant Music Direct Launch
+  // Instant Music Playback (Direct Unrestricted Playback)
   const isMusic = (
     clean.includes("song") || clean.includes("songs") || clean.includes("paata") ||
     clean.includes("paatalu") || clean.includes("gaana") || clean.includes("gaane") ||
@@ -183,13 +183,12 @@ function runFastAction(cmd) {
 
     const targetUrl = `https://www.youtube.com/results?search_query=${encodeURIComponent(q)}`;
 
-    // Directly open in YouTube app or full tab without embedding blocks
     setTimeout(() => {
       const win = window.open(targetUrl, "_blank");
       if (!win) window.location.href = targetUrl;
     }, 250);
 
-    return `Playing "${q}" directly on YouTube, Boss. <a href="${targetUrl}" target="_blank" style="color:#00ffaa;text-decoration:underline;font-weight:bold;">Tap to open stream</a>.`;
+    return `Playing "${q}" directly on YouTube, Boss. <a href="${targetUrl}" target="_blank" style="color:#00ffaa;text-decoration:underline;font-weight:bold;">Tap to stream</a>.`;
   }
 
   return null;
@@ -312,7 +311,7 @@ if (input) {
   });
 }
 
-// Voice Recognition
+// Multilingual Speech Recognition
 const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
 if (SR && micBtn) {
   const rec = new SR();
@@ -334,7 +333,7 @@ if (SR && micBtn) {
   rec.onerror = () => setReactor("idle");
 }
 
-// Visual Sensor Telemetry
+// Camera Sensor
 if (camBtn && imgInput) {
   camBtn.onclick = () => imgInput.click();
 

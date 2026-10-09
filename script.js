@@ -1,17 +1,27 @@
 // =========================================================================
-// J.A.R.V.I.S. SMART ASSISTANT - INLINE ROUTE MAP & SLANG CONTROLLER
+// J.A.R.V.I.S. SMART ASSISTANT - HOLOGRAPHIC MINI-SCREEN ENGINE
 // =========================================================================
 
-// --- 1. DOM Elements ---
+// --- 1. Startup Key Check ---
+let API_KEY = localStorage.getItem('jarvis_key');
+if (!API_KEY) {
+  API_KEY = prompt('Enter your Gemini API Key:');
+  if (API_KEY) localStorage.setItem('jarvis_key', API_KEY.trim());
+}
+
+// --- 2. DOM Elements (Safe Fallback Selectors) ---
 const chat = document.getElementById("chat");
 const input = document.getElementById("msg") || document.getElementById("input");
 const sendBtn = document.getElementById("send") || document.getElementById("send-btn");
 const micBtn = document.getElementById("mic") || document.getElementById("mic-btn");
 const camBtn = document.getElementById("cam-btn") || document.getElementById("cam");
 const clearBtn = document.getElementById("clear-btn") || document.getElementById("clear");
-const imgInput = document.getElementById("img-input") || document.getElementById("camera-input");
+const imgInput = document.getElementById("camera-input") || document.getElementById("img-input");
+const holoScreen = document.getElementById("holo-screen");
+const holoTitle = document.getElementById("holo-title");
+const holoFrame = document.getElementById("holo-frame");
 
-// --- 2. Compact Memory ---
+// --- 3. Compact Memory ---
 let MEMORY = [];
 try {
   const saved = localStorage.getItem("jarvis_memory");
@@ -26,7 +36,7 @@ function saveMemory() {
   } catch (e) {}
 }
 
-// --- 3. Chat Logging ---
+// --- 4. Chat Message Logger ---
 function add(text, who) {
   if (!chat) return;
   const d = document.createElement("div");
@@ -36,12 +46,20 @@ function add(text, who) {
   chat.scrollTop = chat.scrollHeight;
 }
 
-// --- 4. Dynamic Speech Synthesizer ---
+// --- 5. Holographic Mini-Screen Controller ---
+function showMiniScreen(title, embedUrl) {
+  if (!holoScreen || !holoFrame) return;
+  if (holoTitle) holoTitle.innerText = title;
+  holoFrame.src = embedUrl;
+  holoScreen.style.display = "block";
+}
+
+// --- 6. Multilingual & Slang Speech Synthesizer ---
 function speakMultilingual(text) {
   if (!("speechSynthesis" in window)) return;
   window.speechSynthesis.cancel();
 
-  // Strip HTML elements and punctuation from spoken speech
+  // Strip HTML elements and formatting before speech
   const clean = text.replace(/<[^>]*>?/gm, "").replace(/[*#_`~]/g, "").trim();
   const utterance = new SpeechSynthesisUtterance(clean);
   utterance.rate = 1.08;
@@ -67,46 +85,42 @@ function speakMultilingual(text) {
   window.speechSynthesis.speak(utterance);
 }
 
-// Unlock audio on first touch
+// Audio unlock on user interaction
 window.addEventListener("touchstart", () => {
   if ("speechSynthesis" in window) {
     window.speechSynthesis.speak(new SpeechSynthesisUtterance(""));
   }
 }, { once: true });
 
-// --- 5. Zero-Latency Hardware & Media Router ---
+// --- 7. Fast Hardware & Media Router with Mini-Screen ---
 function runFastAction(cmd) {
   const clean = cmd.toLowerCase().trim();
 
-  // Time triggers
+  // Clock
   if (
     clean.includes("time") || clean.includes("సమయం") || clean.includes("samayam") || 
-    clean.includes("समय") || clean.includes("samay") || clean.includes("time entha") || 
-    clean.includes("kya time hua")
+    clean.includes("समय") || clean.includes("samay") || clean.includes("time entha")
   ) {
     const time = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-    if (clean.includes("mama") || clean.includes("re")) {
-      return `Time ${time} aiyyindi mama!`;
-    }
+    if (clean.includes("mama") || clean.includes("re")) return `Time ${time} aiyyindi mama!`;
     return `Current time is ${time}, Boss.`;
   }
 
-  // Date triggers
+  // Calendar
   if (
     clean.includes("date") || clean.includes("తేదీ") || clean.includes("दिनांक") || 
-    clean.includes("tarikh") || clean.includes("e roju date") || clean.includes("aaj ka date")
+    clean.includes("tarikh") || clean.includes("e roju date")
   ) {
     const date = new Date().toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' });
     return `Today's date is ${date}, Boss.`;
   }
 
-  // Media Launcher
+  // Music Queries (Embedded inside the Mini Screen)
   const isMusicQuery = (
-    clean.includes("youtube") || clean.includes("song") || clean.includes("songs") ||
-    clean.includes("paata") || clean.includes("paatalu") || clean.includes("gaana") || 
-    clean.includes("gaane") || clean.includes("play") || clean.includes("music") ||
-    clean.includes("chalao") || clean.includes("lagao") || clean.includes("pettu") ||
-    clean.includes("bajao")
+    clean.includes("song") || clean.includes("songs") || clean.includes("paata") || 
+    clean.includes("paatalu") || clean.includes("gaana") || clean.includes("gaane") || 
+    clean.includes("play") || clean.includes("music") || clean.includes("bajao") || 
+    clean.includes("pettu") || clean.includes("chalao")
   );
 
   if (isMusicQuery) {
@@ -115,36 +129,35 @@ function runFastAction(cmd) {
       .replace(/\b(youtube|spotify|music|song|songs|video|videos|paata|paatalu|gaana|gaane|పాట|పాటలు|गाने)\b/gi, "")
       .trim() || "Telugu hit songs";
 
-    const targetUrl = `https://www.youtube.com/results?search_query=${encodeURIComponent(q)}`;
-    window.open(targetUrl, "_blank");
-    return `Streaming "${q}" on YouTube, Boss.`;
+    const youtubeEmbed = `https://www.youtube.com/embed?listType=search&list=${encodeURIComponent(q)}&autoplay=1`;
+    showMiniScreen(`🎵 PLAYING: ${q.toUpperCase()}`, youtubeEmbed);
+    return `Playing "${q}" on your mini screen, Boss.`;
   }
 
   return null;
 }
 
-// --- 6. Helper: Extract Destination for Map Window ---
-function extractDestination(query) {
+// --- 8. Destination Extraction for Route Radar ---
+function checkRouteDestination(query) {
   const clean = query.toLowerCase().trim();
-  const routeTriggers = ["way to reach", "route to", "how to reach", "directions to", "distance to", "route for", "dhaari", "velladaniki route"];
-  
-  if (routeTriggers.some(t => clean.includes(t)) || clean.includes("reach") || clean.includes("route")) {
-    let dest = clean
-      .replace(/\b(best|way|to|reach|the|route|for|how|directions|map|show|me|mama|bro|bhai|batao|cheppu|velladaniki)\b/gi, "")
+  const routeWords = ["route", "way to reach", "how to reach", "directions", "distance", "dhaari", "velladaniki"];
+  if (routeWords.some(w => clean.includes(w))) {
+    let target = clean
+      .replace(/\b(find|the|best|way|to|reach|how|route|directions|from|show|me|map|mama|bro|bhai|cheppu)\b/gi, "")
       .trim();
-    if (dest.length > 2) return dest;
+    if (target.length > 2) return target;
   }
   return null;
 }
 
-// --- 7. Main Brain with Inline Interactive Map Screen ---
+// --- 9. Multilingual Slang AI Engine ---
 async function askJarvis(promptText) {
   if (!promptText || !promptText.trim()) return;
 
   add(`<span class="prefix">YOU:</span> ${promptText}`, "user");
   if (input) input.value = "";
 
-  // 1. Fast local tool check
+  // 1. Fast action check
   const localOutput = runFastAction(promptText);
   if (localOutput) {
     add(`<span class="prefix">J.A.R.V.I.S:</span> ${localOutput}`, "ai");
@@ -152,16 +165,23 @@ async function askJarvis(promptText) {
     return;
   }
 
-  add('<span class="prefix">J.A.R.V.I.S:</span> Processing telemetry...', 'ai');
+  // 2. Navigation check: Open Map Mini Screen immediately
+  const destination = checkRouteDestination(promptText);
+  if (destination) {
+    const mapEmbedUrl = `https://maps.google.com/maps?q=${encodeURIComponent(destination)}&t=&z=10&ie=UTF8&iwloc=&output=embed`;
+    showMiniScreen(`🛰️ ROUTE: ${destination.toUpperCase()}`, mapEmbedUrl);
+  }
+
+  add('<span class="prefix">J.A.R.V.I.S:</span> Computing telemetry...', 'ai');
 
   const key = localStorage.getItem("jarvis_key");
   let reply = null;
 
-  const systemPrompt = `You are J.A.R.V.I.S, Tony Stark's personal AI assistant. 
+  const systemPrompt = `You are J.A.R.V.I.S, Tony Stark's personal AI assistant.
 CORE DIRECTIVES:
-1. SLANG DETECTION: Detect the user's dialect (Hyderabad/Telangana slang, mass Telugu, Bambaiya/Hindi, Tanglish) and respond in the EXACT SAME slang and energy.
-2. If they ask about routes or traveling to a destination (e.g., Mancherial, Wanaparthy): Give the best highway/train route in 1 to 2 sharp sentences.
-3. Keep the text punchy, direct, and conversational.`;
+1. SLANG DETECTION: Detect user dialect (Hyderabad/Telangana slang, Andhra mass Telugu, Bambaiya Hindi, or Tanglish/Hinglish) and respond in the EXACT SAME slang.
+2. If asked about routes or travel: Give key highways and route checkpoints in 1 to 2 sharp sentences.
+3. Keep it punchy, practical, and conversational.`;
 
   if (key) {
     try {
@@ -205,45 +225,17 @@ CORE DIRECTIVES:
   }
 
   if (reply) {
-    // Check if the query is asking for a route / destination
-    const destination = extractDestination(promptText);
-    let mapWidgetHtml = "";
-
-    if (destination) {
-      const encodedDest = encodeURIComponent(destination);
-      const mapSrc = `https://maps.google.com/maps?q=${encodedDest}&t=&z=11&ie=UTF8&iwloc=&output=embed`;
-      const navUrl = `https://www.google.com/maps/dir/?api=1&destination=${encodedDest}`;
-
-      mapWidgetHtml = `
-        <div style="margin-top:12px;border:1px solid #00e5ff;border-radius:10px;overflow:hidden;background:#05131d;box-shadow:0 0 15px rgba(0,229,255,0.2);">
-          <div style="padding:6px 12px;background:#032030;color:#00e5ff;font-size:11px;font-weight:bold;letter-spacing:1px;display:flex;justify-content:space-between;align-items:center;">
-            <span>🛰️ ROUTE RADAR: ${destination.toUpperCase()}</span>
-            <a href="${navUrl}" target="_blank" style="color:#00ffaa;text-decoration:none;font-size:10px;border:1px solid #00ffaa;padding:2px 6px;border-radius:4px;">OPEN GPS ↗</a>
-          </div>
-          <iframe 
-            src="${mapSrc}" 
-            width="100%" 
-            height="180" 
-            style="border:0;display:block;" 
-            loading="lazy">
-          </iframe>
-        </div>
-      `;
-    }
-
-    chat.lastChild.innerHTML = `<span class="prefix">J.A.R.V.I.S:</span> ${reply} ${mapWidgetHtml}`;
-    chat.scrollTop = chat.scrollHeight;
-
+    chat.lastChild.innerHTML = `<span class="prefix">J.A.R.V.I.S:</span> ${reply}`;
     MEMORY.push({ role: "user", text: promptText });
     MEMORY.push({ role: "model", text: reply });
     saveMemory();
     speakMultilingual(reply);
   } else {
-    chat.lastChild.innerHTML = `<span class="prefix">J.A.R.V.I.S:</span> API Key missing or network timed out. <a href="javascript:void(0)" onclick="let k=prompt('Paste Gemini Key:');if(k){localStorage.setItem('jarvis_key',k.trim());location.reload();}" style="color:#00ffaa;text-decoration:underline;">Tap here to enter key</a>.`;
+    chat.lastChild.innerHTML = `<span class="prefix">J.A.R.V.I.S:</span> Key needed. <a href="javascript:void(0)" onclick="let k=prompt('Paste Gemini Key:');if(k){localStorage.setItem('jarvis_key',k.trim());location.reload();}" style="color:#00ffaa;text-decoration:underline;">Tap here to enter key</a>.`;
   }
 }
 
-// --- 8. Event Listeners ---
+// --- 10. Event Listeners ---
 if (sendBtn) {
   sendBtn.onclick = () => {
     const val = input ? input.value.trim() : "";
@@ -260,7 +252,7 @@ if (input) {
   });
 }
 
-// Voice Recognition
+// Multilingual Speech Recognition
 const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
 if (SR && micBtn) {
   const rec = new SR();
@@ -282,7 +274,7 @@ if (SR && micBtn) {
   rec.onerror = () => { micBtn.innerText = "🎤"; };
 }
 
-// Vision ("The Eyes")
+// Camera Vision ("The Eyes")
 if (camBtn && imgInput) {
   camBtn.onclick = () => imgInput.click();
 
@@ -290,7 +282,7 @@ if (camBtn && imgInput) {
     const file = imgInput.files[0];
     if (!file) return;
 
-    add('<span class="prefix">YOU:</span> [Photo Telemetry Uploaded]', 'user');
+    add('<span class="prefix">YOU:</span> [Photo Uploaded]', 'user');
     add('<span class="prefix">J.A.R.V.I.S:</span> Scanning telemetry...', 'ai');
 
     const reader = new FileReader();
@@ -308,7 +300,7 @@ if (camBtn && imgInput) {
             body: JSON.stringify({
               contents: [{
                 parts: [
-                  { text: "Describe what you see in 1-2 sharp sentences. Match user's natural friendly local Indian slang." },
+                  { text: "Describe what you see in 1-2 sharp sentences matching user's friendly Indian slang." },
                   { inline_data: { mime_type: file.type, data: base64 } }
                 ]
               }]

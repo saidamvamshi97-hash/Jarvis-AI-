@@ -1,54 +1,115 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <title>J.A.R.V.I.S</title>
-  
-  <link rel="manifest" href="manifest.json">
-  <meta name="theme-color" content="#00ffff">
-  <meta name="mobile-web-app-capable" content="yes">
-  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-
-  <link rel="stylesheet" href="style.css">
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title>J.A.R.V.I.S - Autonomous System</title>
+  <link rel="stylesheet" href="style.css" />
+  <style>
+    /* Holographic Mini-Screen Overlay Styling */
+    #holo-screen {
+      display: none;
+      position: fixed;
+      bottom: 80px;
+      right: 12px;
+      width: 290px;
+      max-width: 86vw;
+      height: 210px;
+      background: #041421;
+      border: 2px solid #00e5ff;
+      border-radius: 12px;
+      box-shadow: 0 0 25px rgba(0, 229, 255, 0.45);
+      z-index: 9999;
+      overflow: hidden;
+      backdrop-filter: blur(8px);
+    }
+    #holo-header {
+      background: #022030;
+      color: #00e5ff;
+      font-family: monospace;
+      font-size: 11px;
+      padding: 6px 10px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      border-bottom: 1px solid #00e5ff;
+    }
+    #holo-close {
+      background: transparent;
+      border: none;
+      color: #ff0055;
+      font-size: 14px;
+      font-weight: bold;
+      cursor: pointer;
+    }
+    #holo-frame {
+      width: 100%;
+      height: calc(100% - 30px);
+      border: none;
+    }
+  </style>
 </head>
 <body>
   <div class="hud-container">
     <header>
-      <h1>J.A.R.V.I.S</h1>
-      <p>SYSTEM ONLINE</p>
+      <h1 class="glitch" data-text="J.A.R.V.I.S">J.A.R.V.I.S</h1>
+      <p class="status-text">SYSTEM ONLINE</p>
     </header>
 
-    <div class="reactor-wrapper">
-      <div class="core" id="arc-core">
-        <div class="ring r1"></div>
-        <div class="ring r2"></div>
+    <!-- Arc Reactor HUD Display -->
+    <div class="reactor-container">
+      <div class="arc-reactor" id="arc-core">
+        <div class="ring outer"></div>
+        <div class="ring middle"></div>
+        <div class="ring inner"></div>
         <div class="center"></div>
       </div>
-      <div class="core-text">ARC REACTOR ACTIVE</div>
+      <p class="reactor-status">ARC REACTOR ACTIVE</p>
     </div>
 
-    <div class="status-panel">
-      <h2>SYSTEM DIAGNOSTICS</h2>
-      <div class="status-row"><span>CORE TEMP</span><span class="status-val on">NORMAL</span></div>
-      <div class="status-row"><span>NETWORK</span><span class="status-val on">SECURE</span></div>
-      <div class="status-row" id="battery-row"><span>POWER LEVEL</span><span class="status-val on">ONLINE</span></div>
+    <!-- Telemetry Diagnostic Panel -->
+    <div class="diagnostic-panel">
+      <div class="panel-header">SYSTEM DIAGNOSTICS</div>
+      <div class="telemetry-row">
+        <span>CORE TEMP</span>
+        <span class="val-ok">NORMAL</span>
+      </div>
+      <div class="telemetry-row">
+        <span>NETWORK</span>
+        <span class="val-ok">SECURE</span>
+      </div>
+      <div class="telemetry-row" id="battery-row">
+        <span>POWER LEVEL</span>
+        <span class="val-ok">ONLINE</span>
+      </div>
     </div>
 
+    <!-- Chat Console Output -->
     <div class="terminal-chat" id="chat">
-      <div class="msg ai"><span class="prefix">J.A.R.V.I.S:</span> Systems operational. Memory and Vision online. Ready, Boss.</div>
+      <div class="msg ai">
+        <span class="prefix">J.A.R.V.I.S:</span> Systems operational. Memory, Vision, and Navigation online. Ready, Boss.
+      </div>
     </div>
 
-    <div class="control-bar">
-      <input type="text" id="msg" placeholder="Enter command..." autocomplete="off">
-      
-      <!-- Hidden Camera File Input & Trigger -->
-      <input type="file" id="camera-input" accept="image/*" capture="environment" style="display: none;">
-      <button id="cam-btn" title="Vision Scan">📸</button>
+    <!-- Holographic Floating Mini Screen Screen -->
+    <div id="holo-screen">
+      <div id="holo-header">
+        <span id="holo-title">🛰️ HUD RADAR</span>
+        <button id="holo-close" onclick="document.getElementById('holo-screen').style.display='none'">✖</button>
+      </div>
+      <iframe id="holo-frame" src="" allow="autoplay; encrypted-media"></iframe>
+    </div>
 
-      <button id="mic" title="Voice Command">🎤</button>
+    <!-- Hidden Input for Camera Capture -->
+    <input type="file" id="camera-input" accept="image/*" capture="environment" style="display: none;" />
+
+    <!-- Control Command Input Bar -->
+    <div class="command-bar">
+      <input type="text" id="msg" placeholder="Enter command..." autocomplete="off" />
+      <button id="cam-btn" title="Visual Capture">📸</button>
+      <button id="mic" title="Voice Recognition">🎤</button>
       <button id="send">SEND</button>
-      <button id="clear-btn" title="Clear Memory">🗑️</button>
+      <button id="clear-btn" title="Wipe Memory">🗑️</button>
     </div>
   </div>
 

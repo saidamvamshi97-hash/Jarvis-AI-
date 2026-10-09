@@ -1,5 +1,5 @@
 // =========================================================================
-// J.A.R.V.I.S. MOBILE ASSISTANT - BULLETPROOF CONTROLLER (EPISODE 05-07)
+// J.A.R.V.I.S. MOBILE ASSISTANT - ADVANCED VOICE MEDIA & AUTONOMOUS ENGINE
 // =========================================================================
 
 // --- 1. DOM Elements ---
@@ -92,31 +92,75 @@ function getApiKey() {
   return localStorage.getItem("jarvis_key") || localStorage.getItem("GEMINI_API_KEY") || null;
 }
 
-// --- 7. Local Fast Hardware & Tool Commands ---
+// --- 7. SPECIALIZED VOICE SONG & HARDWARE ROUTER ---
 function checkLocalCommand(cmd) {
   const clean = cmd.toLowerCase().trim();
 
-  // Time
+  // Instant local time
   if (clean.includes("time")) {
     const timeStr = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
     return `The current time is ${timeStr}, Boss.`;
   }
 
-  // Date
+  // Instant local date
   if (clean.includes("date today") || clean === "what is today" || clean === "date") {
     const dateStr = new Date().toLocaleDateString(undefined, { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
     return `Today is ${dateStr}, Boss.`;
   }
 
-  // Flexible YouTube & Music Trigger
-  if (clean.includes("play ") || clean.includes("youtube") || clean.includes("song") || clean.includes("music")) {
-    let query = clean
-      .replace(/open youtube and play|open youtube|play music on|play song|play music|play/gi, "")
+  // ----------------------------------------------------
+  // ADVANCED VOICE SONG & MEDIA SEARCH ENGINE
+  // ----------------------------------------------------
+  const songKeywords = [
+    "play", "song", "songs", "music", "track", "audio", "listen",
+    "youtube", "spotify", "jiosaavn", "gaana", "wynk"
+  ];
+  const isMediaRequest = songKeywords.some(kw => clean.includes(kw));
+
+  if (isMediaRequest) {
+    // 1. Detect target service
+    let platform = "YouTube";
+    let targetUrl = "";
+
+    // Clean out trigger boilerplate words
+    let searchPhrase = clean
+      .replace(/open youtube and play|open youtube|play on youtube|play in youtube/gi, "")
+      .replace(/play on spotify|open spotify/gi, "")
+      .replace(/play on jiosaavn|open jiosaavn/gi, "")
+      .replace(/play music on|play song on|play song|play songs|play music|play audio|play track|play/gi, "")
+      .replace(/listen to|stream|put on|sing|search song|search music|find song/gi, "")
       .trim();
-    if (!query) query = "trending music";
-    
-    setTimeout(() => window.open(`https://www.youtube.com/results?search_query=${encodeURIComponent(query)}`, "_blank"), 1000);
-    return `Streaming "${query}" via YouTube, Boss.`;
+
+    if (!searchPhrase) searchPhrase = "Top Trending Telugu Songs";
+
+    // Spotify routing
+    if (clean.includes("spotify")) {
+      platform = "Spotify";
+      targetUrl = `https://open.spotify.com/search/${encodeURIComponent(searchPhrase)}`;
+    }
+    // JioSaavn routing
+    else if (clean.includes("jiosaavn") || clean.includes("saavn")) {
+      platform = "JioSaavn";
+      targetUrl = `https://www.jiosaavn.com/search/${encodeURIComponent(searchPhrase)}`;
+    }
+    // YouTube Music routing
+    else if (clean.includes("yt music") || clean.includes("youtube music")) {
+      platform = "YouTube Music";
+      targetUrl = `https://music.youtube.com/search?q=${encodeURIComponent(searchPhrase)}`;
+    }
+    // Default: YouTube Search
+    else {
+      platform = "YouTube";
+      targetUrl = `https://www.youtube.com/results?search_query=${encodeURIComponent(searchPhrase)}`;
+    }
+
+    // Launch streaming link safely
+    setTimeout(() => {
+      const win = window.open(targetUrl, "_blank");
+      if (!win) window.location.href = targetUrl;
+    }, 350);
+
+    return `Streaming "${searchPhrase}" via ${platform}, Boss.`;
   }
 
   return null;
@@ -129,7 +173,7 @@ async function askJarvis(promptText) {
   add(`<span class="prefix">YOU:</span> ${promptText}`, "user");
   if (input) input.value = "";
 
-  // 1. Check local fast-path commands first
+  // 1. Check local fast-path commands and specialized song router first
   const localReply = checkLocalCommand(promptText);
   if (localReply) {
     add(`<span class="prefix">J.A.R.V.I.S:</span> ${localReply}`, 'ai');

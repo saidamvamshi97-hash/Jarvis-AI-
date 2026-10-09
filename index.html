@@ -3,70 +3,81 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
-  <title>J.A.R.V.I.S - Autonomous System</title>
+  <title>J.A.R.V.I.S - Advanced Quantum HUD</title>
   <link rel="stylesheet" href="style.css" />
 </head>
 <body>
   <div class="hud-container">
+    <!-- Top Cyber Header -->
     <header>
+      <div class="hud-top-meta">
+        <span id="live-clock">00:00:00</span>
+        <span class="system-badge">QUANTUM CORE v2.4</span>
+      </div>
       <h1 class="glitch" data-text="J.A.R.V.I.S">J.A.R.V.I.S</h1>
-      <p class="status-text">SYSTEM ONLINE</p>
+      <p class="status-text">NEURAL UPLINK ONLINE</p>
     </header>
 
-    <!-- Arc Reactor -->
+    <!-- Holographic Arc Reactor Core -->
     <div class="reactor-container">
       <div class="arc-reactor" id="arc-core">
         <div class="ring outer"></div>
         <div class="ring middle"></div>
         <div class="ring inner"></div>
-        <div class="center"></div>
+        <div class="center" id="reactor-center"></div>
       </div>
-      <p class="reactor-status">ARC REACTOR ACTIVE</p>
+      <p class="reactor-status" id="reactor-state-label">ARC REACTOR ACTIVE</p>
     </div>
 
-    <!-- Diagnostic Panel -->
+    <!-- Live Telemetry & Battery Diagnostic Deck -->
     <div class="diagnostic-panel">
-      <div class="panel-header">SYSTEM DIAGNOSTICS</div>
+      <div class="panel-header">
+        <span>SYSTEM DIAGNOSTICS</span>
+        <span id="ping-indicator">LATENCY: 18ms</span>
+      </div>
       <div class="telemetry-row">
         <span>CORE TEMP</span>
-        <span class="val-ok">NORMAL</span>
+        <span class="val-ok" id="temp-val">34.2°C NORMAL</span>
       </div>
       <div class="telemetry-row">
-        <span>NETWORK</span>
-        <span class="val-ok">SECURE</span>
+        <span>NETWORK LINK</span>
+        <span class="val-ok" id="net-val">SECURE 5G/WIFI</span>
       </div>
-      <div class="telemetry-row" id="battery-row">
-        <span>POWER LEVEL</span>
-        <span class="val-ok">ONLINE</span>
+      <div class="telemetry-row">
+        <span>BATTERY TELEMETRY</span>
+        <span class="val-ok" id="battery-val">100% [ONLINE]</span>
       </div>
     </div>
 
-    <!-- Terminal Chat Box -->
+    <!-- Holographic Terminal Feed -->
     <div class="terminal-chat" id="chat">
       <div class="msg ai">
-        <span class="prefix">J.A.R.V.I.S:</span> Systems operational. Memory, Vision, and Navigation online. Ready, Boss.
+        <span class="prefix">J.A.R.V.I.S:</span> Quantum systems calibrated. Slang Mirroring, Radar Navigation, and Satellite Vision active. Command me, Boss.
       </div>
     </div>
 
-    <!-- Floating Mini-Screen Window -->
+    <!-- Floating HUD Mini-Screen Window -->
     <div id="holo-screen">
       <div id="holo-header">
-        <span id="holo-title">🛰️ HUD RADAR</span>
-        <button id="holo-close" onclick="document.getElementById('holo-screen').style.display='none'">✖</button>
+        <span id="holo-title">🛰️ RADAR TELEMETRY</span>
+        <div class="holo-actions">
+          <button id="holo-external" title="Open Fullscreen">↗</button>
+          <button id="holo-close" onclick="closeMiniScreen()">✖</button>
+        </div>
       </div>
       <iframe id="holo-frame" src="" allow="autoplay; encrypted-media"></iframe>
     </div>
 
-    <!-- Hidden Camera Input -->
+    <!-- Hidden Optical Camera Receiver -->
     <input type="file" id="camera-input" accept="image/*" capture="environment" style="display: none;" />
 
-    <!-- Unbreakable Single-Row Command Bar -->
+    <!-- Unbreakable Single-Row Glass Control Deck -->
     <div class="command-bar">
-      <input type="text" id="msg" placeholder="Enter command..." autocomplete="off" />
-      <button id="cam-btn" title="Camera">📸</button>
-      <button id="mic" title="Voice">🎤</button>
-      <button id="send">SEND</button>
-      <button id="clear-btn" title="Clear">🗑️</button>
+      <input type="text" id="msg" placeholder="Speak or enter command..." autocomplete="off" />
+      <button id="cam-btn" title="Visual Sensor">📸</button>
+      <button id="mic" title="Voice Input">🎤</button>
+      <button id="send">EXEC</button>
+      <button id="clear-btn" title="Clear Memory">🗑️</button>
     </div>
   </div>
 

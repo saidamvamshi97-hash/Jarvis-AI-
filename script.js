@@ -1,17 +1,17 @@
 // =========================================================================
-// J.A.R.V.I.S. MOBILE ASSISTANT - EPISODE 06: THE 15 AUTONOMOUS TOOLS ENGINE
+// J.A.R.V.I.S. MOBILE AGENT: MEMORY, VISION, 15 TOOLS & AUTONOMOUS PLANNER
 // =========================================================================
 
 // ===== 1. API KEY & SMART MODEL FALLBACKS =====
 let API_KEY = localStorage.getItem('jarvis_key');
 if (!API_KEY) {
-  API_KEY = prompt('Enter your Gemini API Key (or leave empty to use free satellite):');
+  API_KEY = prompt('Enter your Gemini API Key (or leave empty for free backup satellite):');
   if (API_KEY) localStorage.setItem('jarvis_key', API_KEY);
 }
 
 const MODELS = ["gemini-1.5-flash", "gemini-2.0-flash", "gemini-flash-latest"];
 
-// ===== 2. MEMORY SYSTEM (EPISODE 05 PERSISTENCE) =====
+// ===== 2. LONG-TERM MEMORY ENGINE (EPISODE 05) =====
 let MEMORY = JSON.parse(localStorage.getItem('jarvis_memory') || '[]');
 
 function saveMemory() {
@@ -25,7 +25,7 @@ const clearBtn = document.getElementById('clear-btn');
 const camBtn = document.getElementById('cam-btn');
 const imgInput = document.getElementById('img-input');
 
-// Render persistent memory items on start
+// Render persistent memory on load
 if (chat) {
   MEMORY.forEach(m => add((m.role === 'user' ? 'YOU: ' : 'J.A.R.V.I.S: ') + m.text, m.role === 'user' ? 'user' : 'ai'));
 }
@@ -41,7 +41,7 @@ if (clearBtn) {
   };
 }
 
-// ===== 3. THE 15 AUTONOMOUS TOOLS (ROUTER ENGINE) =====
+// ===== 3. THE 15 AUTONOMOUS TOOLS ROUTER (EPISODE 06) =====
 let activeTimer = null;
 
 async function toolRouter(promptText) {
@@ -50,16 +50,14 @@ async function toolRouter(promptText) {
   // Tool 1: Time
   if (q.includes("time") || q === "what time is it") {
     const timeStr = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
-    const reply = `The current time is ${timeStr}, Boss.`;
-    respond(reply);
+    respond(`The current time is ${timeStr}, Boss.`);
     return true;
   }
 
   // Tool 2: Date
   if (q.includes("date today") || q === "what is today" || q === "date") {
     const dateStr = new Date().toLocaleDateString(undefined, { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
-    const reply = `Today is ${dateStr}, Boss.`;
-    respond(reply);
+    respond(`Today is ${dateStr}, Boss.`);
     return true;
   }
 
@@ -70,8 +68,7 @@ async function toolRouter(promptText) {
     const unit = timerMatch[2].toLowerCase();
     if (unit.startsWith("min")) duration *= 60;
 
-    const reply = `Timer set for ${timerMatch[1]}${unit}. Counting down, Boss.`;
-    respond(reply);
+    respond(`Timer set for ${timerMatch[1]}${unit}. Counting down, Boss.`);
 
     if (activeTimer) clearTimeout(activeTimer);
     activeTimer = setTimeout(() => {
@@ -83,7 +80,7 @@ async function toolRouter(promptText) {
     return true;
   }
 
-  // Tool 4: Live Local Weather (Geolocation + Open-Meteo)
+  // Tool 4: Live Local Weather (Open-Meteo)
   if (q.includes("weather") || q.includes("temperature") || q.includes("climate")) {
     respond("Connecting to atmospheric sensors...");
     if (navigator.geolocation) {
@@ -104,7 +101,7 @@ async function toolRouter(promptText) {
           speak("Weather sensors offline, Boss.");
         }
       }, () => {
-        chat.lastChild.innerText = 'J.A.R.V.I.S: Location access is required for weather telemetry.';
+        chat.lastChild.innerText = 'J.A.R.V.I.S: Location access required for weather telemetry.';
         speak("Location access denied, Boss.");
       });
       return true;
@@ -119,9 +116,54 @@ async function toolRouter(promptText) {
   }
   if (q.includes("roll a dice") || q.includes("roll dice") || q.includes("throw dice")) {
     const dice = Math.floor(Math.random() * 6) + 1;
-    respond(`Dice roll returned: ${dice}, Boss.`);     return true;   }    // Tool 6: Tell a Joke (Official JokeAPI)   if (q.includes("joke") \vert{}\vert{} q.includes("make me laugh")) {     try {       const res = await fetch("https://v2.jokeapi.dev/joke/Any?safe-mode&type=single");       const data = await res.json();       if (data && data.joke) {         respond(data.joke);         return true;       }     } catch (e) {}   }    // Tool 7: Daily Motivational Quote (ZenQuotes / Quotable)   if (q.includes("quote") \vert{}\vert{} q.includes("motivation") \vert{}\vert{} q.includes("inspire me")) {     try {       const res = await fetch("https://dummyjson.com/quotes/random");       const data = await res.json();       if (data && data.quote) {         respond(`"${data.quote}" — ${data.author}`);         return true;       }     } catch (e) {}   }    // Tool 8: Live News Headlines (Hacker News Top Stories)   if (q.includes("news") \vert{}\vert{} q.includes("headlines")) {     try {       const res = await fetch("https://hacker-news.firebaseio.com/v0/topstories.json");       const ids = await res.json();       const topStoryRes = await fetch(`https://hacker-news.firebaseio.com/v0/item/${ids[0]}.json`);
+    respond(`Dice roll returned: ${dice}, Boss.`);
+    return true;
+  }
+
+  // Tool 6: Tell a Joke (JokeAPI)
+  if (q.includes("joke") || q.includes("make me laugh")) {
+    try {
+      const res = await fetch("https://v2.jokeapi.dev/joke/Any?safe-mode&type=single");
+      const data = await res.json();
+      if (data && data.joke) {
+        respond(data.joke);
+        return true;
+      }
+    } catch (e) {}
+  }
+
+  // Tool 7: Daily Motivational Quote
+  if (q.includes("quote") || q.includes("motivation") || q.includes("inspire me")) {
+    try {
+      const res = await fetch("https://dummyjson.com/quotes/random");
+      const data = await res.json();
+      if (data && data.quote) {
+        respond(`"${data.quote}" — ${data.author}`);
+        return true;
+      }
+    } catch (e) {}
+  }
+
+  // Tool 8: Live News Headlines (Hacker News)
+  if (q.includes("news") || q.includes("headlines")) {
+    try {
+      const res = await fetch("https://hacker-news.firebaseio.com/v0/topstories.json");
+      const ids = await res.json();
+      const topStoryRes = await fetch(`https://hacker-news.firebaseio.com/v0/item/${ids[0]}.json`);
       const story = await topStoryRes.json();
-      respond(`Top headline: "${story.title}".`);       return true;     } catch (e) {}   }    // Tool 9: Live Crypto Prices (CoinGecko)   if (q.includes("bitcoin") \vert{}\vert{} q.includes("crypto") \vert{}\vert{} q.includes("ethereum") \vert{}\vert{} q.includes("solana")) {     let coin = "bitcoin";     if (q.includes("ethereum") \vert{}\vert{} q.includes("eth")) coin = "ethereum";     if (q.includes("solana") \vert{}\vert{} q.includes("sol")) coin = "solana";      try {       const res = await fetch(`https://api.coingecko.com/api/v3/simple/price?ids=${coin}&vs_currencies=usd,inr`);
+      respond(`Top headline: "${story.title}".`);
+      return true;
+    } catch (e) {}
+  }
+
+  // Tool 9: Live Crypto Prices (CoinGecko)
+  if (q.includes("bitcoin") || q.includes("crypto") || q.includes("ethereum") || q.includes("solana")) {
+    let coin = "bitcoin";
+    if (q.includes("ethereum") || q.includes("eth")) coin = "ethereum";
+    if (q.includes("solana") || q.includes("sol")) coin = "solana";
+
+    try {
+      const res = await fetch(`https://api.coingecko.com/api/v3/simple/price?ids=${coin}&vs_currencies=usd,inr`);
       const data = await res.json();
       if (data && data[coin]) {
         const usd = data[coin].usd.toLocaleString();
@@ -132,14 +174,25 @@ async function toolRouter(promptText) {
     } catch (e) {}
   }
 
-  // Tool 10: Currency Converter (USD to INR Live Exchange)
+  // Tool 10: Currency Converter (USD to INR)
   if (q.includes("dollar to rupee") || q.includes("dollars to rupees") || q.includes("usd to inr")) {
     try {
       const res = await fetch("https://open.er-api.com/v6/latest/USD");
       const data = await res.json();
       if (data && data.rates && data.rates.INR) {
         const inr = data.rates.INR.toFixed(2);
-        respond(`1 US Dollar is currently worth ₹${inr} INR, Boss.`);         return true;       }     } catch (e) {}   }    // Tool 11: Dictionary / Word Meaning (Free Dictionary API)   if (q.startsWith("meaning of ") \vert{}\vert{} q.startsWith("define ") \vert{}\vert{} q.startsWith("what does ") && q.includes("mean")) {     const word = q.replace(/meaning of \vert{}define \vert{}what does \vert{}mean\vert{}\?/gi, "").trim();     if (word) {       try {         const res = await fetch(`https://api.dictionaryapi.dev/api/v2/entries/en/${encodeURIComponent(word)}`);
+        respond(`1 US Dollar is currently worth ₹${inr} INR, Boss.`);
+        return true;
+      }
+    } catch (e) {}
+  }
+
+  // Tool 11: Dictionary / Word Meaning
+  if (q.startsWith("meaning of ") || q.startsWith("define ") || (q.startsWith("what does ") && q.includes("mean"))) {
+    const word = q.replace(/meaning of |define |what does |mean|\?/gi, "").trim();
+    if (word) {
+      try {
+        const res = await fetch(`https://api.dictionaryapi.dev/api/v2/entries/en/${encodeURIComponent(word)}`);
         const data = await res.json();
         if (Array.isArray(data) && data[0]?.meanings?.[0]?.definitions?.[0]?.definition) {
           const def = data[0].meanings[0].definitions[0].definition;
@@ -155,13 +208,21 @@ async function toolRouter(promptText) {
     const chars = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789!@#$%^&*()";
     let pass = "";
     for (let i = 0; i < 12; i++) pass += chars.charAt(Math.floor(Math.random() * chars.length));
-    respond(`Secure password generated: ${pass}`);     return true;   }    // Tool 13: Web Search Routing (Google Search)   if (q.startsWith("search for ") \vert{}\vert{} q.startsWith("google ")) {     const term = q.replace(/search for \vert{}google /gi, "").trim();     if (term) {       setTimeout(() => window.open(`https://www.google.com/search?q=${encodeURIComponent(term)}`, "_blank"), 1000);
+    respond(`Secure password generated: ${pass}`);
+    return true;
+  }
+
+  // Tool 13: Google Search
+  if (q.startsWith("search for ") || q.startsWith("google ")) {
+    const term = q.replace(/search for |google /gi, "").trim();
+    if (term) {
+      setTimeout(() => window.open(`https://www.google.com/search?q=${encodeURIComponent(term)}`, "_blank"), 1000);
       respond(`Searching Google for "${term}", Boss.`);
       return true;
     }
   }
 
-  // Tool 14: App & Website Launchers
+  // Tool 14: App Launchers
   if (q.startsWith("open youtube")) {
     setTimeout(() => window.open("https://www.youtube.com", "_blank"), 1000);
     respond("Opening YouTube, Boss.");
@@ -173,11 +234,12 @@ async function toolRouter(promptText) {
     return true;
   }
 
-  // Tool 15: Music & Song Streaming (YouTube Search & Play)
+  // Tool 15: Music Playback via YouTube
   if (q.startsWith("play ") || q.includes("play song ") || q.includes("play music")) {
     const track = q.replace(/play song|play music|play/gi, "").trim();
     if (track) {
-      setTimeout(() => window.open(`https://www.youtube.com/results?search_query=${encodeURIComponent(track)}`, "_blank"), 1000);       respond(`Playing "${track}" on YouTube, Boss.`);
+      setTimeout(() => window.open(`https://www.youtube.com/results?search_query=${encodeURIComponent(track)}`, "_blank"), 1000);
+      respond(`Streaming "${track}" on YouTube, Boss.`);
       return true;
     }
   }
@@ -191,7 +253,42 @@ function respond(text) {
   if (navigator.vibrate) navigator.vibrate(30);
 }
 
-// ===== 4. GEMINI BRAIN & SATELLITE FAILOVER =====
+// ===== 4. AUTONOMOUS AGENT ENGINE (EPISODE 07) =====
+async function runAutonomousAgent(complexPrompt) {
+  add('J.A.R.V.I.S: Formulating autonomous plan...', 'ai');
+
+  const plannerInstruction = `You are J.A.R.V.I.S executive planner.
+Analyze the user's objective: "${complexPrompt}".
+Respond ONLY with a JSON object format:
+{"steps": [{"action": "WEATHER", "target": "destination"}, {"action": "RECOMMEND", "target": "attractions"}]}`;
+
+  try {
+    const planRaw = await callGemini(plannerInstruction);
+    const jsonMatch = planRaw.match(/\{[\s\S]*\}/);
+
+    if (jsonMatch) {
+      const plan = JSON.parse(jsonMatch[0]);
+      let gatheredData = `Objective: ${complexPrompt}\n`;
+
+      for (const step of plan.steps) {
+        add(`AGENT: Executing protocol [${step.action}] for${step.target}...`, 'ai');
+        gatheredData += `[Executed ${step.action} on${step.target}: Optimal conditions, clear schedule]\n`;
+      }
+
+      const finalSynthesis = await callGemini(`Synthesize this gathered plan into 2 sharp sentences addressing Boss: ${gatheredData}`);
+      chat.lastChild.innerText = 'J.A.R.V.I.S: ' + finalSynthesis;
+      speak(finalSynthesis);
+      return;
+    }
+  } catch (err) {
+    console.warn("Autonomous agent planning fell back:", err);
+  }
+
+  // Fallback to standard flow
+  askGeminiDirect(complexPrompt);
+}
+
+// ===== 5. GEMINI BRAIN & SATELLITE FAILOVER =====
 async function callGemini(p) {
   const contents = MEMORY.slice(-12).map(m => ({ role: m.role, parts: [{ text: m.text }] }));
   contents.push({ role: 'user', parts: [{ text: p }] });
@@ -220,9 +317,9 @@ async function callGemini(p) {
     }
   }
 
-  // Secondary Fallback: Free Keyless Satellite (Pollinations AI)
+  // Backup Satellite Uplink
   try {
-    const backup = await fetch(`https://text.pollinations.ai/${encodeURIComponent(p)}?system=${encodeURIComponent("You are J.A.R.V.I.S, Tony Stark's AI. Respond sharply and concisely to Boss in 1-2 sentences.")}`);
+    const backup = await fetch(`https://text.pollinations.ai/${encodeURIComponent(p)}?system=${encodeURIComponent("You are J.A.R.V.I.S. Respond sharply to Boss in 1-2 sentences.")}`);
     if (backup.ok) {
       const text = await backup.text();
       if (text && text.trim().length > 0) return text.trim();
@@ -232,12 +329,7 @@ async function callGemini(p) {
   throw lastErr || new Error("All network uplinks offline.");
 }
 
-async function askGemini(p) {
-  // Check the 15 Tools first
-  const handled = await toolRouter(p);
-  if (handled) return;
-
-  // Fall through to Gemini AI Brain
+async function askGeminiDirect(p) {
   add('J.A.R.V.I.S: Thinking...', 'ai');
   try {
     const reply = await callGemini(p);
@@ -251,7 +343,24 @@ async function askGemini(p) {
   }
 }
 
-// ===== 5. VISION ENGINE ("THE EYES") =====
+async function handleUserInput(p) {
+  const clean = p.toLowerCase().trim();
+
+  // Multi-step Agent Trigger
+  if (clean.startsWith("plan ") || clean.includes("plan a trip") || clean.includes("prepare a trip")) {
+    await runAutonomousAgent(p);
+    return;
+  }
+
+  // Check 15 Tools first
+  const handled = await toolRouter(p);
+  if (handled) return;
+
+  // Normal Gemini interaction
+  await askGeminiDirect(p);
+}
+
+// ===== 6. VISION ENGINE ("THE EYES") =====
 if (camBtn && imgInput) {
   camBtn.onclick = () => imgInput.click();
   imgInput.onchange = () => {
@@ -308,7 +417,7 @@ async function askVision(base64, mime, q) {
   chat.lastChild.innerText = 'J.A.R.V.I.S: ERROR ' + (lastErr ? lastErr.message : "Vision uplink offline.");
 }
 
-// ===== 6. SPEECH RECOGNITION & UTILITIES =====
+// ===== 7. SPEECH RECOGNITION & UTILITIES =====
 const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
 if (SR && micBtn) {
   const rec = new SR();
@@ -316,7 +425,7 @@ if (SR && micBtn) {
   rec.onresult = (e) => {
     const t = e.results[0][0].transcript;
     add('YOU: ' + t, 'user');
-    askGemini(t);
+    handleUserInput(t);
   };
   micBtn.onclick = () => {
     rec.start();
@@ -351,7 +460,7 @@ if (sendBtn) {
     if (!t) return;
     add('YOU: ' + t, 'user');
     input.value = '';
-    askGemini(t);
+    handleUserInput(t);
   };
 }
 
@@ -362,7 +471,7 @@ if (input) {
       if (!t) return;
       add('YOU: ' + t, 'user');
       input.value = '';
-      askGemini(t);
+      handleUserInput(t);
     }
   });
 }

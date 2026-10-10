@@ -9,7 +9,7 @@
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <meta name="theme-color" content="#00ffff">
 
-  <link rel="stylesheet" href="style.css?v=20261011">
+  <link rel="stylesheet" href="style.css?v=20261011_hud">
 </head>
 <body>
   <div class="jarvis-container">
@@ -36,15 +36,28 @@
     </footer>
   </div>
 
-  <!-- Floating Navigation HUD Overlay -->
-  <div id="floatingMapModal" class="map-modal">
-    <div class="map-header">
-      <span id="mapTitle">NAVIGATION HUD // ACTIVE</span>
-      <button class="map-close-btn" onclick="closeFloatingMap()">✕</button>
+  <!-- 1. Floating YouTube Music HUD Window -->
+  <div id="floatingMusicModal" class="floating-hud-modal">
+    <div class="hud-header">
+      <span id="musicTitle">AUDIO STREAM // ACTIVE</span>
+      <button class="hud-close-btn" onclick="closeFloatingMusic()">✕</button>
     </div>
-    <iframe id="mapFrame" src="" allowfullscreen="" loading="lazy"></iframe>
+    <div class="hud-body">
+      <iframe id="musicFrame" src="" allow="autoplay; encrypted-media" allowfullscreen loading="lazy"></iframe>
+    </div>
   </div>
 
-  <script src="script.js?v=20261011"></script>
+  <!-- 2. Floating Navigation HUD Overlay -->
+  <div id="floatingMapModal" class="floating-hud-modal">
+    <div class="hud-header">
+      <span id="mapTitle">NAVIGATION HUD // ACTIVE</span>
+      <button class="hud-close-btn" onclick="closeFloatingMap()">✕</button>
+    </div>
+    <div class="hud-body">
+      <iframe id="mapFrame" src="" allowfullscreen loading="lazy"></iframe>
+    </div>
+  </div>
+
+  <script src="script.js?v=20261011_hud"></script>
 </body>
 </html>

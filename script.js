@@ -1,5 +1,5 @@
 // =========================================================================
-// J.A.R.V.I.S. ZERO-LATENCY INTENT & DEVICE DISPATCH ENGINE (V5)
+// J.A.R.V.I.S. BULLETPROOF LOCAL INTERCEPTOR & SPEECH ENGINE (V6)
 // =========================================================================
 
 const WORKER_ENDPOINT = "https://jarvis-automation.saidamvamshi97.workers.dev/api/ask";
@@ -10,7 +10,6 @@ let commandRecognition = null;
 let isWakeActive = false;
 let isCommandActive = false;
 
-// Audio synthesis initialization
 window.addEventListener("touchstart", () => {
   if ("speechSynthesis" in window) {
     window.speechSynthesis.speak(new SpeechSynthesisUtterance(""));
@@ -41,26 +40,29 @@ function setJarvisVisualState(state) {
   }
 }
 
-// 1. High-Priority Intent Matcher (<10ms)
+// Aggressive Local Action Interceptor
 function interceptLocalAction(rawPrompt) {
   const p = rawPrompt.toLowerCase().trim();
 
-  // A. Time & Clock
+  // 1. Time / Clock
   if (p.includes("time") || p.includes("watch") || p.includes("clock") || p.includes("samayam") || p.includes("entha")) {
     const timeStr = new Date().toLocaleTimeString("en-IN", { hour: "numeric", minute: "2-digit", hour12: true });
     const reply = `The time is ${timeStr}, Boss.`;
-    document.getElementById("responseBox").innerText = reply;
+    updateUI(reply, `Action: Time Checked`);
     speakVoiceQuick(reply);
     return true;
   }
 
-  // B. Media & YouTube Dispatch
-  const isMedia = [
+  // 2. Music / Video / Actor Media Matcher
+  const mediaKeywords = [
     "play", "paly", "ply", "song", "songs", "music", "youtube", "video",
-    "chiranjeevi", "prabhas", "bahubali", "pawan", "kalyan", "rebel", "salaar", "og"
-  ].some(term => p.includes(term));
+    "chiranjeevi", "prabhas", "bahubali", "pawan", "kalyan", "rebel", "salaar", "og",
+    "devara", "ntr", "mahesh", "allu arjun", "dsp", "thaman", "anirudh"
+  ];
 
-  if (isMedia) {
+  const matched = mediaKeywords.some(keyword => p.includes(keyword));
+
+  if (matched) {
     let cleanQuery = p
       .replace(/when\s+(i\s+have\s+to|do\s+i|should\s+i)/gi, "")
       .replace(/how\s+(to|do\s+i)/gi, "")
@@ -72,52 +74,54 @@ function interceptLocalAction(rawPrompt) {
     if (!cleanQuery || cleanQuery === "song" || cleanQuery === "songs") {
       if (p.includes("chiranjeevi")) cleanQuery = "Chiranjeevi hit songs";
       else if (p.includes("prabhas")) cleanQuery = "Prabhas hit songs";
-      else cleanQuery = "Telugu latest hit songs";
+      else cleanQuery = "Telugu hit songs";
     }
 
-    const feedback = `Playing ${cleanQuery} on YouTube, Boss.`;
-    document.getElementById("responseBox").innerText = feedback;
-    speakVoiceQuick(feedback);
+    const reply = `Playing ${cleanQuery} on YouTube, Boss.`;
+    updateUI(reply, `Dispatched: YouTube -> "${cleanQuery}"`);
+    speakVoiceQuick(reply);
 
     setTimeout(() => {
       const url = `https://www.youtube.com/results?search_query=${encodeURIComponent(cleanQuery)}`;
-      // Window.open avoids PWA redirection locks on Android
-      const opened = window.open(url, "_blank");
-      if (!opened) {
-        window.location.href = url;
-      }
-    }, 600);
+      window.location.assign(url);
+    }, 700);
     return true;
   }
 
-  // C. Navigation & Maps
+  // 3. Navigation / Maps
   if (p.includes("navigate") || p.includes("nivgate") || p.includes("navgate") || p.includes("route") || p.includes("direction") || p.includes("map")) {
     let dest = p.replace(/.*(?:navigate to|nivgate to|navgate to|route to|map to|go to)/gi, "").trim();
     if (!dest) dest = "Mancherial";
 
-    const feedback = `Plotting route to ${dest}, Boss.`;
-    document.getElementById("responseBox").innerText = feedback;
-    speakVoiceQuick(feedback);
+    const reply = `Plotting route to ${dest}, Boss.`;
+    updateUI(reply, `Dispatched: Navigation -> "${dest}"`);
+    speakVoiceQuick(reply);
     openFloatingMap(dest);
     return true;
   }
 
-  // D. Google Search
+  // 4. Google Search
   if (p.includes("search") || p.includes("google")) {
     const q = p.replace(/.*(?:search google for|google search|search for|google)/gi, "").trim();
-    const feedback = `Searching Google for ${q}, Boss.`;
-    document.getElementById("responseBox").innerText = feedback;
-    speakVoiceQuick(feedback);
+    const reply = `Searching Google for ${q}, Boss.`;
+    updateUI(reply, `Dispatched: Google -> "${q}"`);
+    speakVoiceQuick(reply);
     setTimeout(() => {
-      window.open(`https://www.google.com/search?q=${encodeURIComponent(q)}`, "_blank");
-    }, 600);
+      window.location.assign(`https://www.google.com/search?q=${encodeURIComponent(q)}`);
+    }, 700);
     return true;
   }
 
   return false;
 }
 
-// In-App Navigation HUD
+function updateUI(mainText, debugText) {
+  const box = document.getElementById("responseBox");
+  const debug = document.getElementById("debugBox");
+  if (box) box.innerText = mainText;
+  if (debug && debugText) debug.innerText = debugText;
+}
+
 function openFloatingMap(destination) {
   const modal = document.getElementById("floatingMapModal");
   const frame = document.getElementById("mapFrame");
@@ -135,10 +139,9 @@ function closeFloatingMap() {
   setJarvisVisualState("IDLE");
 }
 
-// 2. Command Capture & Fallback Router
 function startCommandListening() {
   if (!SpeechRecognition) {
-    alert("SpeechRecognition unsupported. Use Chrome.");
+    alert("SpeechRecognition unsupported. Please use Chrome.");
     return;
   }
 
@@ -148,10 +151,7 @@ function startCommandListening() {
   }
 
   setJarvisVisualState("LISTENING");
-  const box = document.getElementById("responseBox");
-  const debug = document.getElementById("debugBox");
-  box.innerText = "Listening...";
-  if (debug) debug.innerText = "Listening for audio...";
+  updateUI("Listening...", "Mic active. Speak now.");
 
   commandRecognition = new SpeechRecognition();
   commandRecognition.continuous = false;
@@ -160,8 +160,9 @@ function startCommandListening() {
 
   commandRecognition.onresult = async (event) => {
     const prompt = event.results[0][0].transcript;
-    if (debug) debug.innerText = `Transcript: "${prompt}"`;
+    updateUI(`"${prompt}"`, `Heard: "${prompt}"`);
 
+    // Intercept local actions first
     if (interceptLocalAction(prompt)) {
       setJarvisVisualState("IDLE");
       isCommandActive = false;
@@ -170,6 +171,7 @@ function startCommandListening() {
 
     setJarvisVisualState("THINKING");
 
+    // Route to Cloudflare Worker
     try {
       const res = await fetch(WORKER_ENDPOINT, {
         method: "POST",
@@ -177,11 +179,11 @@ function startCommandListening() {
         body: JSON.stringify({ prompt })
       });
       const data = await res.json();
-      const reply = data.reply || "Done, Boss.";
-      box.innerText = reply;
+      const reply = data.reply || "No response received, Boss.";
+      updateUI(reply, `Cloudflare Answer Received`);
       speakVoiceQuick(reply);
     } catch (err) {
-      box.innerText = "Systems link timeout.";
+      updateUI("Systems link timeout, Boss.", `Network Error: ${err.message}`);
     }
 
     setJarvisVisualState("IDLE");
@@ -190,7 +192,7 @@ function startCommandListening() {
   };
 
   commandRecognition.onerror = (e) => {
-    if (debug) debug.innerText = `Error: ${e.error}`;
+    updateUI("Listening aborted.", `Mic Error: ${e.error}`);
     setJarvisVisualState("IDLE");
     isCommandActive = false;
     resumeWakeEngine();
@@ -222,7 +224,6 @@ function speakVoiceQuick(text) {
   window.speechSynthesis.speak(utterance);
 }
 
-// 3. Hotword Engine
 function initWakeWordEngine() {
   if (!SpeechRecognition) return;
 
@@ -233,8 +234,7 @@ function initWakeWordEngine() {
 
   wakeRecognition.onresult = (event) => {
     const text = event.results[event.resultIndex][0].transcript.trim().toLowerCase();
-    const debug = document.getElementById("debugBox");
-    if (debug) debug.innerText = `Wake Audio: "${text}"`;
+    updateUI("Ready for command, Boss.", `Wake Word Detected: "${text}"`);
 
     if (text.includes("hey jarvis") || text.includes("jarvis") || text.includes("hai jarvis")) {
       speakVoiceQuick("Yes Boss?");
@@ -256,7 +256,6 @@ function toggleWakeWord() {
 
   const btn = document.getElementById("wakeToggleBtn");
   const txt = document.getElementById("wakeBtnText");
-  const box = document.getElementById("responseBox");
 
   if (!isWakeActive) {
     try {
@@ -264,14 +263,14 @@ function toggleWakeWord() {
       isWakeActive = true;
       if (btn) btn.classList.add("active");
       if (txt) txt.innerText = "Wake Mode: ON";
-      box.innerText = "Wake Mode active. Say 'Hey Jarvis'...";
+      updateUI("Wake Mode Active", "Listening for 'Hey Jarvis'...");
     } catch (err) {}
   } else {
     isWakeActive = false;
     try { wakeRecognition.stop(); } catch (e) {}
     if (btn) btn.classList.remove("active");
     if (txt) txt.innerText = "Wake Mode: OFF";
-    box.innerText = "Ready, Boss.";
+    updateUI("Ready for command, Boss.", "Wake Mode Off.");
     setJarvisVisualState("IDLE");
   }
 }

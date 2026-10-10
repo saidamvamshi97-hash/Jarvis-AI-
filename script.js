@@ -1,5 +1,5 @@
 // =========================================================================
-// J.A.R.V.I.S. BULLETPROOF LOCAL INTERCEPTOR & SPEECH ENGINE (V6)
+// J.A.R.V.I.S. ZERO-LATENCY INTENT & FLOATING HUD ENGINE
 // =========================================================================
 
 const WORKER_ENDPOINT = "https://jarvis-automation.saidamvamshi97.workers.dev/api/ask";
@@ -40,29 +40,33 @@ function setJarvisVisualState(state) {
   }
 }
 
-// Aggressive Local Action Interceptor
+function updateUI(mainText, debugText) {
+  const box = document.getElementById("responseBox");
+  const debug = document.getElementById("debugBox");
+  if (box) box.innerText = mainText;
+  if (debug && debugText) debug.innerText = debugText;
+}
+
+// 1. High-Priority Local Action Interceptor (<10ms)
 function interceptLocalAction(rawPrompt) {
   const p = rawPrompt.toLowerCase().trim();
 
-  // 1. Time / Clock
+  // A. Time / Clock
   if (p.includes("time") || p.includes("watch") || p.includes("clock") || p.includes("samayam") || p.includes("entha")) {
     const timeStr = new Date().toLocaleTimeString("en-IN", { hour: "numeric", minute: "2-digit", hour12: true });
     const reply = `The time is ${timeStr}, Boss.`;
-    updateUI(reply, `Action: Time Checked`);
+    updateUI(reply, "Action: Time Checked");
     speakVoiceQuick(reply);
     return true;
   }
 
-  // 2. Music / Video / Actor Media Matcher
+  // B. Floating In-Page YouTube Music HUD
   const mediaKeywords = [
     "play", "paly", "ply", "song", "songs", "music", "youtube", "video",
-    "chiranjeevi", "prabhas", "bahubali", "pawan", "kalyan", "rebel", "salaar", "og",
-    "devara", "ntr", "mahesh", "allu arjun", "dsp", "thaman", "anirudh"
+    "chiranjeevi", "prabhas", "bahubali", "pawan", "kalyan", "rebel", "salaar", "og"
   ];
 
-  const matched = mediaKeywords.some(keyword => p.includes(keyword));
-
-  if (matched) {
+  if (mediaKeywords.some(keyword => p.includes(keyword))) {
     let cleanQuery = p
       .replace(/when\s+(i\s+have\s+to|do\s+i|should\s+i)/gi, "")
       .replace(/how\s+(to|do\s+i)/gi, "")
@@ -72,23 +76,19 @@ function interceptLocalAction(rawPrompt) {
       .trim();
 
     if (!cleanQuery || cleanQuery === "song" || cleanQuery === "songs") {
-      if (p.includes("chiranjeevi")) cleanQuery = "Chiranjeevi hit songs";
-      else if (p.includes("prabhas")) cleanQuery = "Prabhas hit songs";
+      if (p.includes("chiranjeevi")) cleanQuery = "Chiranjeevi songs";
+      else if (p.includes("prabhas")) cleanQuery = "Prabhas songs";
       else cleanQuery = "Telugu hit songs";
     }
 
-    const reply = `Playing ${cleanQuery} on YouTube, Boss.`;
-    updateUI(reply, `Dispatched: YouTube -> "${cleanQuery}"`);
+    const reply = `Streaming ${cleanQuery} in Floating HUD, Boss.`;
+    updateUI(reply, `Dispatched: Floating Music HUD -> "${cleanQuery}"`);
     speakVoiceQuick(reply);
-
-    setTimeout(() => {
-      const url = `https://www.youtube.com/results?search_query=${encodeURIComponent(cleanQuery)}`;
-      window.location.assign(url);
-    }, 700);
+    openFloatingMusic(cleanQuery);
     return true;
   }
 
-  // 3. Navigation / Maps
+  // C. Floating Map HUD
   if (p.includes("navigate") || p.includes("nivgate") || p.includes("navgate") || p.includes("route") || p.includes("direction") || p.includes("map")) {
     let dest = p.replace(/.*(?:navigate to|nivgate to|navgate to|route to|map to|go to)/gi, "").trim();
     if (!dest) dest = "Mancherial";
@@ -100,34 +100,41 @@ function interceptLocalAction(rawPrompt) {
     return true;
   }
 
-  // 4. Google Search
-  if (p.includes("search") || p.includes("google")) {
-    const q = p.replace(/.*(?:search google for|google search|search for|google)/gi, "").trim();
-    const reply = `Searching Google for ${q}, Boss.`;
-    updateUI(reply, `Dispatched: Google -> "${q}"`);
-    speakVoiceQuick(reply);
-    setTimeout(() => {
-      window.location.assign(`https://www.google.com/search?q=${encodeURIComponent(q)}`);
-    }, 700);
-    return true;
-  }
-
   return false;
 }
 
-function updateUI(mainText, debugText) {
-  const box = document.getElementById("responseBox");
-  const debug = document.getElementById("debugBox");
-  if (box) box.innerText = mainText;
-  if (debug && debugText) debug.innerText = debugText;
+// In-App Floating Music HUD Controls
+function openFloatingMusic(query) {
+  const modal = document.getElementById("floatingMusicModal");
+  const frame = document.getElementById("musicFrame");
+  const title = document.getElementById("musicTitle");
+
+  if (title) title.innerText = `AUDIO STREAM // ${query.toUpperCase()}`;
+  if (frame) {
+    // Embed endpoint with autoplay and listType=search keeps the session within the HUD
+    frame.src = `https://www.youtube.com/embed?listType=search&list=${encodeURIComponent(query)}&autoplay=1`;
+  }
+  if (modal) modal.style.display = "flex";
 }
 
+function closeFloatingMusic() {
+  const modal = document.getElementById("floatingMusicModal");
+  const frame = document.getElementById("musicFrame");
+  if (modal) modal.style.display = "none";
+  if (frame) frame.src = "";
+  setJarvisVisualState("IDLE");
+}
+
+// In-App Floating Navigation HUD Controls
 function openFloatingMap(destination) {
   const modal = document.getElementById("floatingMapModal");
   const frame = document.getElementById("mapFrame");
   const title = document.getElementById("mapTitle");
+
   if (title) title.innerText = `NAVIGATION HUD // ${destination.toUpperCase()}`;
-  if (frame) frame.src = `https://maps.google.com/maps?q=${encodeURIComponent(destination)}&t=&z=13&ie=UTF8&iwloc=&output=embed`;
+  if (frame) {
+    frame.src = `https://maps.google.com/maps?q=${encodeURIComponent(destination)}&t=&z=13&ie=UTF8&iwloc=&output=embed`;
+  }
   if (modal) modal.style.display = "flex";
 }
 
@@ -139,6 +146,7 @@ function closeFloatingMap() {
   setJarvisVisualState("IDLE");
 }
 
+// Speech Recognition & Gemini Handlers
 function startCommandListening() {
   if (!SpeechRecognition) {
     alert("SpeechRecognition unsupported. Please use Chrome.");
@@ -162,7 +170,6 @@ function startCommandListening() {
     const prompt = event.results[0][0].transcript;
     updateUI(`"${prompt}"`, `Heard: "${prompt}"`);
 
-    // Intercept local actions first
     if (interceptLocalAction(prompt)) {
       setJarvisVisualState("IDLE");
       isCommandActive = false;
@@ -171,7 +178,6 @@ function startCommandListening() {
 
     setJarvisVisualState("THINKING");
 
-    // Route to Cloudflare Worker
     try {
       const res = await fetch(WORKER_ENDPOINT, {
         method: "POST",
@@ -179,11 +185,11 @@ function startCommandListening() {
         body: JSON.stringify({ prompt })
       });
       const data = await res.json();
-      const reply = data.reply || "No response received, Boss.";
-      updateUI(reply, `Cloudflare Answer Received`);
+      const reply = data.reply || "Done, Boss.";
+      updateUI(reply, "Cloudflare Response Received");
       speakVoiceQuick(reply);
     } catch (err) {
-      updateUI("Systems link timeout, Boss.", `Network Error: ${err.message}`);
+      updateUI("Systems link timeout, Boss.", `Error: ${err.message}`);
     }
 
     setJarvisVisualState("IDLE");
@@ -234,7 +240,7 @@ function initWakeWordEngine() {
 
   wakeRecognition.onresult = (event) => {
     const text = event.results[event.resultIndex][0].transcript.trim().toLowerCase();
-    updateUI("Ready for command, Boss.", `Wake Word Detected: "${text}"`);
+    updateUI("Ready for command, Boss.", `Wake Word: "${text}"`);
 
     if (text.includes("hey jarvis") || text.includes("jarvis") || text.includes("hai jarvis")) {
       speakVoiceQuick("Yes Boss?");

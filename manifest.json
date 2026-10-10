@@ -3,7 +3,7 @@
   "short_name": "JARVIS",
   "start_url": "./index.html",
   "display": "standalone",
-  "background_color": "#05070e",
+  "background_color": "#030712",
   "theme_color": "#00ffff",
   "orientation": "portrait",
   "icons": [

@@ -46,23 +46,26 @@ function setJarvisVisualState(state) {
 function interceptLocalAction(rawPrompt) {
   const p = rawPrompt.toLowerCase().trim();
 
-  // Music & YouTube Interceptor (covers "play", "songs", "bahubali", "youtube")
+  // Music & YouTube Interceptor (catches "play", "paly", "ply", "song", "songs", "prabhas", "bahubali", "youtube")
   if (
     p.includes("play") || 
+    p.includes("paly") || 
+    p.includes("ply") || 
     p.includes("song") || 
     p.includes("songs") || 
     p.includes("youtube") || 
     p.includes("music") || 
+    p.includes("prabhas") ||
     p.includes("bahubali")
   ) {
     let query = p
       .replace(/^(hey jarvis|jarvis|please|can you)/gi, "")
-      .replace(/play/gi, "")
+      .replace(/\b(play|paly|ply|ple|start|listen to)\b/gi, "")
       .replace(/on youtube/gi, "")
       .replace(/in youtube/gi, "")
       .trim();
 
-    if (!query) query = "Bahubali songs";
+    if (!query) query = "Prabhas songs";
 
     const box = document.getElementById("responseBox");
     if (box) box.innerText = `Playing ${query} on YouTube...`;

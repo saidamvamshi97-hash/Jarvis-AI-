@@ -1,429 +1,145 @@
 // =========================================================================
-// J.A.R.V.I.S. QUANTUM ENGINE v2.4 - GESTURE HANDOVER & NAVIGATION CONTROLLER
+// EPISODE 09: CORE ORB STATES + "HEY JARVIS" SPEECH ENGINE
 // =========================================================================
 
-// --- 1. DOM Elements ---
-const chat = document.getElementById("chat");
-const input = document.getElementById("msg");
-const sendBtn = document.getElementById("send");
-const micBtn = document.getElementById("mic");
-const camBtn = document.getElementById("cam-btn");
-const clearBtn = document.getElementById("clear-btn");
-const imgInput = document.getElementById("camera-input");
-const holoScreen = document.getElementById("holo-screen");
-const holoTitle = document.getElementById("holo-title");
-const holoFrame = document.getElementById("holo-frame");
-const holoExternal = document.getElementById("holo-external");
-const reactorCenter = document.getElementById("reactor-center");
-const reactorLabel = document.getElementById("reactor-state-label");
-const liveClock = document.getElementById("live-clock");
-const batteryVal = document.getElementById("battery-val");
+const WORKER_ENDPOINT = "https://jarvis-automation.saidamvamshi97.workers.dev/api/ask";
 
-let currentExternalUrl = "";
+let wakeRecognition = null;
+let commandRecognition = null;
+let isWakeActive = false;
 
-// --- 2. Real-Time Telemetry & Clock ---
-setInterval(() => {
-  if (liveClock) {
-    liveClock.innerText = new Date().toLocaleTimeString();
-  }
-}, 1000);
+// 1. Visual Orb State Controller
+function setJarvisVisualState(state) {
+  const orb = document.querySelector(".orb-inner");
+  const ring = document.querySelector(".orb-ring");
+  if (!orb) return;
 
-if (navigator.getBattery) {
-  navigator.getBattery().then(battery => {
-    function updateBattery() {
-      if (batteryVal) {
-        const pct = Math.round(battery.level * 100);
-        const charging = battery.charging ? " [CHARGING]" : " [ONLINE]";
-        batteryVal.innerText = `${pct}\%${charging}`;
-      }
-    }
-    updateBattery();
-    battery.addEventListener("levelchange", updateBattery);
-    battery.addEventListener("chargingchange", updateBattery);
-  });
-}
-
-// --- 3. Audio Synth Effects & Arc Reactor HUD States ---
-const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-
-function playSynthTone(freq, type = "sine", duration = 0.1) {
-  try {
-    const osc = audioCtx.createOscillator();
-    const gain = audioCtx.createGain();
-    osc.type = type;
-    osc.frequency.setValueAtTime(freq, audioCtx.currentTime);
-    gain.gain.setValueAtTime(0.05, audioCtx.currentTime);
-    gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + duration);
-    osc.connect(gain);
-    gain.connect(audioCtx.destination);
-    osc.start();
-    osc.stop(audioCtx.currentTime + duration);
-  } catch (e) {}
-}
-
-function setReactor(state) {
-  if (!reactorCenter || !reactorLabel) return;
-  if (state === "listening") {
-    reactorCenter.style.background = "#ff0055";
-    reactorCenter.style.boxShadow = "0 0 35px #ff0055";
-    reactorLabel.innerText = "SENSOR LISTENING";
-    playSynthTone(587, "triangle", 0.15);
-  } else if (state === "thinking") {
-    reactorCenter.style.background = "#ffaa00";
-    reactorCenter.style.boxShadow = "0 0 35px #ffaa00";
-    reactorLabel.innerText = "CALCULATING TELEMETRY";
-  } else if (state === "speaking") {
-    reactorCenter.style.background = "#00ffaa";
-    reactorCenter.style.boxShadow = "0 0 35px #00ffaa";
-    reactorLabel.innerText = "VOCAL TRANSMISSION";
-  } else {
-    reactorCenter.style.background = "#00f0ff";
-    reactorCenter.style.boxShadow = "0 0 30px #00f0ff";
-    reactorLabel.innerText = "ARC REACTOR ACTIVE";
+  switch (state) {
+    case "IDLE":
+      orb.style.backgroundColor = "#00ffff";
+      orb.style.boxShadow = "0 0 25px #00ffff";
+      if (ring) ring.style.borderColor = "#00ffff";
+      break;
+    case "LISTENING":
+      orb.style.backgroundColor = "#00ff00";
+      orb.style.boxShadow = "0 0 30px #00ff00";
+      if (ring) ring.style.borderColor = "#00ff00";
+      break;
+    case "THINKING":
+      orb.style.backgroundColor = "#ffa500";
+      orb.style.boxShadow = "0 0 35px #ffa500";
+      if (ring) ring.style.borderColor = "#ffa500";
+      break;
   }
 }
 
-// --- 4. Chat Message Appender ---
-function add(text, who) {
-  if (!chat) return;
-  const d = document.createElement("div");
-  d.className = "msg " + who;
-  d.innerHTML = text;
-  chat.appendChild(d);
-  chat.scrollTop = chat.scrollHeight;
-}
+// 2. Continuous Hotword Detector ("Hey Jarvis")
+function initWakeWordEngine() {
+  const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+  if (!SpeechRecognition) return;
 
-// --- 5. Holographic Mini-Screen Control ---
-function showMiniScreen(title, embedUrl, externalUrl = null) {
-  if (!holoScreen || !holoFrame) return;
-  holoTitle.innerText = title;
-  holoFrame.src = embedUrl;
-  currentExternalUrl = externalUrl || embedUrl;
-  holoScreen.style.display = "block";
-  holoScreen.style.zIndex = "9999";
-  playSynthTone(880, "sine", 0.2);
-}
+  wakeRecognition = new SpeechRecognition();
+  wakeRecognition.continuous = true;
+  wakeRecognition.interimResults = false;
+  wakeRecognition.lang = "en-US";
 
-function closeMiniScreen() {
-  if (holoScreen && holoFrame) {
-    holoFrame.src = "";
-    holoScreen.style.display = "none";
-  }
-}
+  wakeRecognition.onresult = (event) => {
+    const current = event.resultIndex;
+    const transcript = event.results[current][0].transcript.trim().toLowerCase();
 
-if (holoExternal) {
-  holoExternal.onclick = () => {
-    if (currentExternalUrl) window.open(currentExternalUrl, "_blank");
-  };
-}
-
-// --- Double Tap Handover Gesture ---
-let lastTapTime = 0;
-if (holoScreen) {
-  holoScreen.ondblclick = () => {
-    if (currentExternalUrl) {
-      window.open(currentExternalUrl, "_blank");
-      playSynthTone(1046, "sine", 0.15);
+    if (transcript.includes("hey jarvis") || transcript.includes("jarvis")) {
+      document.getElementById("responseBox").innerText = "Listening to you, Boss...";
+      speakVoiceFeedback("Yes Boss?");
+      startCommandListening();
     }
   };
 
-  holoScreen.addEventListener("touchend", (e) => {
-    const currentTime = new Date().getTime();
-    const tapLength = currentTime - lastTapTime;
-    if (tapLength < 350 && tapLength > 0) {
-      if (currentExternalUrl) {
-        window.open(currentExternalUrl, "_blank");
-        playSynthTone(1046, "sine", 0.15);
-      }
-      e.preventDefault();
-    }
-    lastTapTime = currentTime;
-  });
+  wakeRecognition.onend = () => {
+    if (isWakeActive) wakeRecognition.start();
+  };
 }
 
-// --- 6. Adaptive Speech Synthesizer ---
-function speakMultilingual(text) {
-  if (!("speechSynthesis" in window)) return;
-  window.speechSynthesis.cancel();
+// 3. User Command Listener
+function startCommandListening() {
+  const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+  if (!SpeechRecognition) return;
 
-  const clean = text.replace(/<[^>]*>?/gm, "").replace(/[*#_`~]/g, "").trim();
-  const utterance = new SpeechSynthesisUtterance(clean);
-  utterance.rate = 1.08;
-  utterance.pitch = 0.98;
-
-  const hasTelugu = /[\u0C00-\u0C7F]/.test(clean);
-  const hasHindi = /[\u0900-\u097F]/.test(clean);
-
-  const voices = window.speechSynthesis.getVoices();
-  let v = null;
-  if (hasTelugu) v = voices.find(vo => vo.lang.includes("te"));
-  else if (hasHindi) v = voices.find(vo => vo.lang.includes("hi"));
-
-  if (!v) v = voices.find(vo => vo.lang.includes("en-IN") || vo.lang.startsWith("en"));
-  if (v) utterance.voice = v;
-
-  utterance.onstart = () => setReactor("speaking");
-  utterance.onend = () => setReactor("idle");
-  utterance.onerror = () => setReactor("idle");
-
-  window.speechSynthesis.speak(utterance);
-}
-
-window.addEventListener("touchstart", () => {
-  if ("speechSynthesis" in window) {
-    window.speechSynthesis.speak(new SpeechSynthesisUtterance(""));
-  }
-}, { once: true });
-
-// --- 7. Fast Action & Route Extraction ---
-function runFastAction(cmd) {
-  const clean = cmd.toLowerCase().trim();
-
-  // Instant Time
-  if (clean.includes("time") || clean.includes("samayam") || clean.includes("samay") || clean.includes("సమయం")) {
-    const time = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-    if (clean.includes("mama") || clean.includes("re")) return `Time ${time} aiyyindi mama!`;
-    return `Current time is ${time}, Boss.`;
+  if (wakeRecognition && isWakeActive) {
+    wakeRecognition.stop();
   }
 
-  // Instant Date
-  if (clean.includes("date") || clean.includes("today") || clean.includes("తేదీ") || clean.includes("tarikh")) {
-    const date = new Date().toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' });
-    return `Today's date is ${date}, Boss.`;
-  }
+  setJarvisVisualState("LISTENING");
+  commandRecognition = new SpeechRecognition();
+  commandRecognition.continuous = false;
+  commandRecognition.interimResults = false;
+  commandRecognition.lang = "en-US";
 
-  // Instant Music Playback
-  const isMusic = (
-    clean.includes("song") || clean.includes("songs") || clean.includes("paata") ||
-    clean.includes("paatalu") || clean.includes("gaana") || clean.includes("gaane") ||
-    clean.includes("play") || clean.includes("music") || clean.includes("bajao") ||
-    clean.includes("pettu") || clean.includes("chalao")
-  );
+  commandRecognition.onresult = async (event) => {
+    const prompt = event.results[0][0].transcript;
+    document.getElementById("responseBox").innerText = `"${prompt}"`;
+    setJarvisVisualState("THINKING");
 
-  if (isMusic) {
-    let q = clean
-      .replace(/\b(open|play|search|find|on|in|to|stream|listen|pettu|cheyyi|kavali|chalao|lagao|suno|bajao|re|mama|bro)\b/gi, "")
-      .replace(/\b(youtube|spotify|music|song|songs|video|videos|paata|paatalu|gaana|gaane|పాట|పాటలు|गाने)\b/gi, "")
-      .trim() || "Telugu hit songs";
-
-    const targetUrl = `https://www.youtube.com/results?search_query=${encodeURIComponent(q)}`;
-
-    // Show preview and support double-tap app launch
-    showMiniScreen(`🎵 MEDIA: ${q.toUpperCase()}`, `https://www.youtube.com/embed?listType=search&list=${encodeURIComponent(q)}`, targetUrl);
-
-    setTimeout(() => {
-      const win = window.open(targetUrl, "_blank");
-      if (!win) window.location.href = targetUrl;
-    }, 250);
-
-    return `Playing "${q}" directly on YouTube, Boss. (Double tap mini screen to switch to app).`;
-  }
-
-  return null;
-}
-
-// Universal Route Intent Detector
-function checkDestination(query) {
-  const clean = query.toLowerCase().trim();
-  const navTriggers = [
-    "navigate to", "navigate", "route to", "way to reach", 
-    "how to reach", "directions to", "directions", "distance to", 
-    "dhaari", "velladaniki", "vellu", "raasta", "reach"
-  ];
-
-  if (navTriggers.some(t => clean.includes(t))) {
-    let dest = clean
-      .replace(/\b(navigate to|navigate|find|the|best|way|to|reach|how|route|directions|from|show|me|map|dhaari|velladaniki|vellu|raasta)\b/gi, "")
-      .replace(/\b(vinay|jarvis|hey|hi|mama|bro|bhai|cheppu|batao|please)\b/gi, "")
-      .trim();
-
-    if (dest.length > 2) return dest;
-  }
-  return null;
-}
-
-// --- 8. Slang Chameleon Neural Brain (Gemini 2.0 Flash) ---
-let MEMORY = [];
-try {
-  const saved = localStorage.getItem("jarvis_memory");
-  if (saved) MEMORY = JSON.parse(saved).slice(-4);
-} catch (e) { MEMORY = []; }
-
-async function askJarvis(promptText) {
-  if (!promptText || !promptText.trim()) return;
-
-  add(`<span class="prefix">YOU:</span> ${promptText}`, "user");
-  if (input) input.value = "";
-
-  const localOutput = runFastAction(promptText);
-  if (localOutput) {
-    add(`<span class="prefix">J.A.R.V.I.S:</span> ${localOutput}`, "ai");
-    speakMultilingual(localOutput);
-    return;
-  }
-
-  const destination = checkDestination(promptText);
-  if (destination) {
-    const mapEmbed = `https://maps.google.com/maps?q=${encodeURIComponent(destination)}&t=&z=11&ie=UTF8&iwloc=&output=embed`;
-    const navDirect = `https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(destination)}`;
-    showMiniScreen(`🛰️ RADAR: ${destination.toUpperCase()}`, mapEmbed, navDirect);
-  }
-
-  add('<span class="prefix">J.A.R.V.I.S:</span> Computing telemetry...', 'ai');
-  setReactor("thinking");
-
-  const key = localStorage.getItem("jarvis_key");
-  let reply = null;
-
-  const systemPrompt = `You are J.A.R.V.I.S, Tony Stark's personal AI assistant.
-CORE SLANG MIRROR DIRECTIVE:
-- Detect the user's dialect (Hyderabad/Telangana slang, Andhra mass Telugu, Bambaiya Hindi, or Tanglish/Hinglish).
-- Reply in the EXACT SAME slang register and energy.
-- If asked about travel routes (e.g., Mancherial, Wanaparthy), state key highway numbers and approximate duration in 1 to 2 sharp sentences.
-- Keep answers punchy, natural, and limited to 2 sentences max.`;
-
-  if (key) {
+    // Call Cloudflare Worker
     try {
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 8000);
-
-      const contents = MEMORY.map(m => ({ role: m.role, parts: [{ text: m.text }] }));
-      contents.push({ role: "user", parts: [{ text: promptText }] });
-
-      const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${key}`, {
+      const res = await fetch(WORKER_ENDPOINT, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        signal: controller.signal,
-        body: JSON.stringify({
-          contents: contents,
-          systemInstruction: { parts: [{ text: systemPrompt }] },
-          generationConfig: { maxOutputTokens: 90, temperature: 0.35 }
-        })
+        body: JSON.stringify({ prompt: prompt })
       });
-      clearTimeout(timeoutId);
-
       const data = await res.json();
-      if (data.candidates?.[0]?.content?.parts?.[0]?.text) {
-        reply = data.candidates[0].content.parts[0].text.trim();
-      }
-    } catch (e) {}
-  }
-
-  if (!reply) {
-    try {
-      const fallbackUrl = `https://text.pollinations.ai/${encodeURIComponent(promptText)}?system=${encodeURIComponent(systemPrompt)}`;
-      const res = await fetch(fallbackUrl);
-      if (res.ok) reply = (await res.text()).trim();
-    } catch (e) {}
-  }
-
-  if (reply) {
-    chat.lastChild.innerHTML = `<span class="prefix">J.A.R.V.I.S:</span> ${reply}`;
-    MEMORY.push({ role: "user", text: promptText });
-    MEMORY.push({ role: "model", text: reply });
-    try { localStorage.setItem("jarvis_memory", JSON.stringify(MEMORY.slice(-4))); } catch (e) {}
-    speakMultilingual(reply);
-  } else {
-    chat.lastChild.innerHTML = `<span class="prefix">J.A.R.V.I.S:</span> Key needed. <a href="javascript:void(0)" onclick="let k=prompt('Paste Gemini Key:');if(k){localStorage.setItem('jarvis_key',k.trim());location.reload();}" style="color:#00ffaa;text-decoration:underline;">Tap here to enter key</a>.`;
-    setReactor("idle");
-  }
-}
-
-// --- 9. Listeners & Controls ---
-if (sendBtn) {
-  sendBtn.onclick = () => {
-    const val = input ? input.value.trim() : "";
-    if (val) askJarvis(val);
-  };
-}
-
-if (input) {
-  input.addEventListener("keydown", (e) => {
-    if (e.key === "Enter") {
-      const val = input.value.trim();
-      if (val) askJarvis(val);
+      const reply = data.reply || "Done, Boss.";
+      document.getElementById("responseBox").innerText = reply;
+      speakVoiceFeedback(reply);
+    } catch (e) {
+      document.getElementById("responseBox").innerText = "Systems link timeout.";
     }
-  });
+
+    setJarvisVisualState("IDLE");
+    if (isWakeActive && wakeRecognition) {
+      wakeRecognition.start();
+    }
+  };
+
+  commandRecognition.onerror = () => {
+    setJarvisVisualState("IDLE");
+    if (isWakeActive && wakeRecognition) wakeRecognition.start();
+  };
+
+  commandRecognition.start();
 }
 
-// Voice Recognition
-const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
-if (SR && micBtn) {
-  const rec = new SR();
-  rec.lang = "en-IN";
-  rec.interimResults = false;
-
-  micBtn.onclick = () => {
-    setReactor("listening");
-    rec.start();
-  };
-
-  rec.onresult = (e) => {
-    const t = e.results[0][0].transcript;
-    if (input) input.value = t;
-    askJarvis(t);
-  };
-
-  rec.onend = () => setReactor("idle");
-  rec.onerror = () => setReactor("idle");
+function triggerManualListening() {
+  startCommandListening();
 }
 
-// Camera Sensor
-if (camBtn && imgInput) {
-  camBtn.onclick = () => imgInput.click();
-
-  imgInput.onchange = () => {
-    const file = imgInput.files[0];
-    if (!file) return;
-
-    add('<span class="prefix">YOU:</span> [Optical Telemetry Uploaded]', 'user');
-    add('<span class="prefix">J.A.R.V.I.S:</span> Analyzing visual telemetry...', 'ai');
-    setReactor("thinking");
-
-    const reader = new FileReader();
-    reader.onload = async () => {
-      const base64 = reader.result.split(',')[1];
-      const key = localStorage.getItem("jarvis_key");
-      let reply = null;
-
-      if (key) {
-        try {
-          const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${key}`, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              contents: [{
-                parts: [
-                  { text: "Analyze telemetry. Respond in 1-2 sharp sentences matching user's Indian slang." },
-                  { inline_data: { mime_type: file.type, data: base64 } }
-                ]
-              }]
-            })
-          });
-          const data = await res.json();
-          if (data.candidates?.[0]?.content?.parts?.[0]?.text) {
-            reply = data.candidates[0].content.parts[0].text;
-          }
-        } catch (e) {}
-      }
-
-      if (reply) {
-        chat.lastChild.innerHTML = `<span class="prefix">J.A.R.V.I.S:</span> ${reply}`;
-        speakMultilingual(reply);
-      } else {
-        chat.lastChild.innerHTML = `<span class="prefix">J.A.R.V.I.S:</span> Visual scan failed, Boss.`;
-      }
-      setReactor("idle");
-    };
-    reader.readAsDataURL(file);
-  };
+function speakVoiceFeedback(text) {
+  if ("speechSynthesis" in window) {
+    const utterance = new SpeechSynthesisUtterance(text);
+    utterance.lang = "en-US";
+    window.speechSynthesis.speak(utterance);
+  }
 }
 
-if (clearBtn) {
-  clearBtn.onclick = () => {
-    MEMORY = [];
-    localStorage.removeItem("jarvis_memory");
-    add("SYSTEM: Memory core cleared.", "ai");
-    playSynthTone(440, "sine", 0.15);
-  };
+function toggleWakeWord() {
+  if (!wakeRecognition) initWakeWordEngine();
+
+  const btn = document.getElementById("wakeToggleBtn");
+  const txt = document.getElementById("wakeBtnText");
+
+  if (!isWakeActive) {
+    try {
+      wakeRecognition.start();
+      isWakeActive = true;
+      if (btn) btn.classList.add("active");
+      if (txt) txt.innerText = "Wake Mode: ON";
+      document.getElementById("responseBox").innerText = "Say 'Hey Jarvis'...";
+    } catch (err) {}
+  } else {
+    isWakeActive = false;
+    wakeRecognition.stop();
+    if (btn) btn.classList.remove("active");
+    if (txt) txt.innerText = "Wake Mode: OFF";
+    document.getElementById("responseBox").innerText = "Ready for command, Boss...";
+    setJarvisVisualState("IDLE");
+  }
 }

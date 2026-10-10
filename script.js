@@ -1,5 +1,5 @@
 // =========================================================================
-// J.A.R.V.I.S. MULTILINGUAL RUNTIME + HARDWARE NOISE FILTER & FAILOVER ENGINE
+// J.A.R.V.I.S. FUTURISTIC RUNTIME: SOUND SYNTHESIS + SPECTRAL ANALYZER + HAPTICS
 // =========================================================================
 
 const WORKER_ENDPOINT = "https://jarvis-automation.saidamvamshi97.workers.dev/api/ask";
@@ -9,15 +9,169 @@ let wakeRecognition = null;
 let commandRecognition = null;
 let isWakeActive = false;
 let isCommandActive = false;
-let mediaStream = null;
 
-// Audio synthesis warmup
-window.addEventListener("touchstart", () => {
-  if ("speechSynthesis" in window) {
-    window.speechSynthesis.speak(new SpeechSynthesisUtterance(""));
+// Audio Context & Hardware Spectral Nodes
+let audioCtx = null;
+let micStream = null;
+let analyserNode = null;
+let animFrameId = null;
+
+// Initialize Web Audio Context on first tap
+function initAudioEngine() {
+  if (!audioCtx) {
+    audioCtx = new (window.AudioContext || window.webkitAudioContext)();
   }
-}, { once: true });
+  if (audioCtx.state === "suspended") {
+    audioCtx.resume();
+  }
+}
+window.addEventListener("touchstart", initAudioEngine, { once: true });
+window.addEventListener("click", initAudioEngine, { once: true });
 
+// -------------------------------------------------------------------------
+// SYNTHESIZED SOUND GENERATOR (Zero Audio Files Needed)
+// -------------------------------------------------------------------------
+function playFuturisticChime(type) {
+  try {
+    initAudioEngine();
+    if (!audioCtx) return;
+
+    const osc = audioCtx.createOscillator();
+    const gain = audioCtx.createGain();
+    osc.connect(gain);
+    gain.connect(audioCtx.destination);
+
+    const now = audioCtx.currentTime;
+
+    if (type === "WAKE") {
+      // High-tech Dual Sine Glissando
+      osc.type = "sine";
+      osc.frequency.setValueAtTime(587.33, now); // D5
+      osc.frequency.exponentialRampToValueAtTime(880, now + 0.12); // A5
+      gain.gain.setValueAtTime(0.18, now);
+      gain.gain.exponentialRampToValueAtTime(0.001, now + 0.28);
+      osc.start(now);
+      osc.stop(now + 0.28);
+    } else if (type === "PROCESSING") {
+      // Tech Tri-tone Click
+      osc.type = "triangle";
+      osc.frequency.setValueAtTime(440, now);
+      osc.frequency.exponentialRampToValueAtTime(1320, now + 0.1);
+      gain.gain.setValueAtTime(0.12, now);
+      gain.gain.exponentialRampToValueAtTime(0.001, now + 0.15);
+      osc.start(now);
+      osc.stop(now + 0.15);
+    } else if (type === "OFF") {
+      // Power-down pitch drop
+      osc.type = "sawtooth";
+      osc.frequency.setValueAtTime(520, now);
+      osc.frequency.exponentialRampToValueAtTime(120, now + 0.25);
+      gain.gain.setValueAtTime(0.15, now);
+      gain.gain.exponentialRampToValueAtTime(0.001, now + 0.25);
+      osc.start(now);
+      osc.stop(now + 0.25);
+    }
+  } catch (e) {}
+}
+
+// -------------------------------------------------------------------------
+// HAPTIC ENGINE
+// -------------------------------------------------------------------------
+function triggerHaptic(type) {
+  if (!("vibrate" in navigator)) return;
+  if (type === "WAKE") {
+    navigator.vibrate([40, 60, 50]); // Stark double-pulse
+  } else if (type === "OFF") {
+    navigator.vibrate(30);
+  }
+}
+
+// -------------------------------------------------------------------------
+// REAL-TIME VOICE VISUALIZER & DB SENSITIVITY
+// -------------------------------------------------------------------------
+async function startSpectralTelemetry() {
+  try {
+    initAudioEngine();
+    micStream = await navigator.mediaDevices.getUserMedia({
+      audio: {
+        echoCancellation: true,
+        noiseSuppression: true,
+        autoGainControl: true
+      }
+    });
+
+    const source = audioCtx.createMediaStreamSource(micStream);
+    analyserNode = audioCtx.createAnalyser();
+    analyserNode.fftSize = 256;
+    source.connect(analyserNode);
+
+    const bufferLength = analyserNode.frequencyBinCount;
+    const dataArray = new Uint8Array(bufferLength);
+
+    const orbInner = document.querySelector(".orb-inner");
+    const signalFill = document.getElementById("hudSignalFill");
+    const dbText = document.getElementById("dbLevelText");
+    const hzText = document.getElementById("hzLevelText");
+
+    function renderSpectralLoop() {
+      if (!isWakeActive && !isCommandActive) return;
+      analyserNode.getByteFrequencyData(dataArray);
+
+      let sum = 0;
+      let maxVal = 0;
+      for (let i = 0; i < bufferLength; i++) {
+        sum += dataArray[i];
+        if (dataArray[i] > maxVal) maxVal = dataArray[i];
+      }
+      const average = sum / bufferLength;
+
+      // Real-time Audio Reactive Core Scaling
+      const scaleFactor = 1 + (average / 255) * 0.45;
+      if (orbInner) {
+        orbInner.style.transform = `scale(${scaleFactor.toFixed(2)})`;
+      }
+
+      // Live Telemetry Bar & Frequency
+      if (signalFill) {
+        signalFill.style.width = `${Math.min(100, average * 2.2)}%`;
+      }
+      if (dbText) {
+        const dB = Math.round(average ? 20 * Math.log10(average / 255) : -60);
+        dbText.innerText = `${dB} dB`;
+      }
+      if (hzText) {
+        const estHz = Math.round(maxVal * 16.5);
+        hzText.innerText = `${estHz} Hz`;
+      }
+
+      animFrameId = requestAnimationFrame(renderSpectralLoop);
+    }
+    renderSpectralLoop();
+  } catch (err) {
+    console.warn("Audio Analyser bypass:", err);
+  }
+}
+
+function stopSpectralTelemetry() {
+  if (animFrameId) cancelAnimationFrame(animFrameId);
+  if (micStream) {
+    micStream.getTracks().forEach(t => t.stop());
+    micStream = null;
+  }
+  const orbInner = document.querySelector(".orb-inner");
+  const signalFill = document.getElementById("hudSignalFill");
+  const dbText = document.getElementById("dbLevelText");
+  const hzText = document.getElementById("hzLevelText");
+
+  if (orbInner) orbInner.style.transform = "scale(1)";
+  if (signalFill) signalFill.style.width = "0%";
+  if (dbText) dbText.innerText = "-INF dB";
+  if (hzText) hzText.innerText = "000 Hz";
+}
+
+// -------------------------------------------------------------------------
+// CORE VISUAL STATES
+// -------------------------------------------------------------------------
 function setJarvisVisualState(state) {
   const orb = document.querySelector(".orb-inner");
   const ring = document.querySelector(".orb-ring");
@@ -26,17 +180,17 @@ function setJarvisVisualState(state) {
 
   if (state === "IDLE") {
     orb.style.backgroundColor = "#00ffff";
-    orb.style.boxShadow = "0 0 25px #00ffff";
+    orb.style.boxShadow = "0 0 28px #00ffff";
     if (ring) ring.style.borderColor = "#00ffff";
     if (glow) glow.style.background = "radial-gradient(circle, rgba(0,255,255,0.4) 0%, rgba(0,255,255,0) 70%)";
   } else if (state === "LISTENING") {
     orb.style.backgroundColor = "#00ff77";
-    orb.style.boxShadow = "0 0 35px #00ff77";
+    orb.style.boxShadow = "0 0 38px #00ff77";
     if (ring) ring.style.borderColor = "#00ff77";
     if (glow) glow.style.background = "radial-gradient(circle, rgba(0,255,119,0.5) 0%, rgba(0,255,119,0) 70%)";
   } else if (state === "THINKING") {
     orb.style.backgroundColor = "#ff9900";
-    orb.style.boxShadow = "0 0 40px #ff9900";
+    orb.style.boxShadow = "0 0 45px #ff9900";
     if (ring) ring.style.borderColor = "#ff9900";
     if (glow) glow.style.background = "radial-gradient(circle, rgba(255,153,0,0.5) 0%, rgba(255,153,0) 70%)";
   }
@@ -50,25 +204,6 @@ function updateUI(mainText, debugText) {
 }
 
 // -------------------------------------------------------------------------
-// HARDWARE DSP NOISE SUPPRESSION
-// -------------------------------------------------------------------------
-async function enableHardwareNoiseFiltering() {
-  try {
-    if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
-      mediaStream = await navigator.mediaDevices.getUserMedia({
-        audio: {
-          echoCancellation: true,
-          noiseSuppression: true,
-          autoGainControl: true
-        }
-      });
-    }
-  } catch (err) {
-    console.warn("Hardware DSP filter bypass:", err);
-  }
-}
-
-// -------------------------------------------------------------------------
 // UNIVERSAL FLOATING HUD ENGINE
 // -------------------------------------------------------------------------
 function openUniversalApp(appName, embedUrl, deepLinkUrl) {
@@ -78,7 +213,6 @@ function openUniversalApp(appName, embedUrl, deepLinkUrl) {
   const pip = document.getElementById("appPipLink");
 
   if (title) title.innerText = `${appName.toUpperCase()} // ACTIVE`;
-  
   if (pip && deepLinkUrl) {
     pip.href = deepLinkUrl;
     pip.style.display = "inline";
@@ -87,12 +221,8 @@ function openUniversalApp(appName, embedUrl, deepLinkUrl) {
     pip.style.display = "none";
   }
 
-  if (frame) {
-    frame.src = embedUrl;
-  }
-  if (modal) {
-    modal.style.display = "flex";
-  }
+  if (frame) frame.src = embedUrl;
+  if (modal) modal.style.display = "flex";
 }
 
 function closeUniversalApp() {
@@ -115,7 +245,7 @@ function splitMultiCommands(prompt) {
 }
 
 function executeSingleAction(p) {
-  // 1. Live Time
+  // 1. Time / Clock
   const timeTriggers = ["time", "watch", "clock", "samayam", "time entha", "samay", "neram", "ghadi"];
   if (timeTriggers.some(w => p.includes(w))) {
     const timeStr = new Date().toLocaleTimeString("en-IN", { hour: "numeric", minute: "2-digit", hour12: true });
@@ -125,7 +255,7 @@ function executeSingleAction(p) {
     return true;
   }
 
-  // 2. Weather Radar HUD
+  // 2. Weather Radar
   if (p.includes("weather") || p.includes("rain") || p.includes("climate") || p.includes("varsham") || p.includes("mausam")) {
     const reply = "Loading atmospheric weather radar, Boss.";
     speakVoiceQuick(reply);
@@ -138,7 +268,7 @@ function executeSingleAction(p) {
     return true;
   }
 
-  // 3. Cricket Scorecard HUD
+  // 3. Cricket Scores
   if (p.includes("cricket") || p.includes("score") || p.includes("ipl") || p.includes("match")) {
     const reply = "Streaming live cricket scorecard in HUD, Boss.";
     speakVoiceQuick(reply);
@@ -147,7 +277,7 @@ function executeSingleAction(p) {
     return true;
   }
 
-  // 4. Calculator HUD
+  // 4. Calculator
   if (p.includes("calculator") || p.includes("calculate") || p.includes("lekkalu") || p.includes("hisab")) {
     const reply = "Opening calculation core, Boss.";
     speakVoiceQuick(reply);
@@ -156,7 +286,7 @@ function executeSingleAction(p) {
     return true;
   }
 
-  // 5. Wikipedia Topic Intel
+  // 5. Wikipedia
   if (p.startsWith("wiki") || p.startsWith("who is") || p.startsWith("what is")) {
     const topic = p.replace(/^(wiki|who is|what is|tell me about)/gi, "").trim();
     if (topic.length > 2) {
@@ -172,7 +302,7 @@ function executeSingleAction(p) {
     }
   }
 
-  // 6. Music & Video Dispatcher
+  // 6. Music & YouTube Intent
   const musicTriggers = [
     "play", "paly", "ply", "song", "songs", "paata", "paatalu", "music", "youtube", "spotify",
     "chiranjeevi", "prabhas", "pawan", "kalyan", "rebel", "salaar", "dsp", "anirudh"
@@ -196,11 +326,7 @@ function executeSingleAction(p) {
       const reply = `Streaming ${cleanQuery} on Spotify HUD, Boss.`;
       speakVoiceQuick(reply);
       updateUI(reply, `Dispatched: Spotify -> "${cleanQuery}"`);
-      openUniversalApp(
-        `Spotify // ${cleanQuery}`,
-        `https://open.spotify.com/embed/search/${encodeURIComponent(cleanQuery)}`,
-        `spotify:search:${encodeURIComponent(cleanQuery)}`
-      );
+      openUniversalApp(`Spotify // ${cleanQuery}`, `https://open.spotify.com/embed/search/${encodeURIComponent(cleanQuery)}`, `spotify:search:${encodeURIComponent(cleanQuery)}`);
     } else {
       const reply = `Playing ${cleanQuery} on YouTube, Boss.`;
       speakVoiceQuick(reply);
@@ -215,7 +341,7 @@ function executeSingleAction(p) {
     return true;
   }
 
-  // 7. Navigation & Maps
+  // 7. Navigation
   const navTriggers = ["navigate", "route", "direction", "map", "raasta", "margam", "vellu"];
   if (navTriggers.some(w => p.includes(w))) {
     let dest = p.replace(/.*(?:navigate to|route to|map to|go to|vellu)/gi, "").replace(/^(hey jarvis|jarvis)/gi, "").trim();
@@ -233,7 +359,6 @@ function executeSingleAction(p) {
 
 async function interceptLocalAction(rawPrompt) {
   const commands = splitMultiCommands(rawPrompt);
-
   if (commands.length <= 1) {
     return executeSingleAction(rawPrompt.toLowerCase());
   }
@@ -249,12 +374,11 @@ async function interceptLocalAction(rawPrompt) {
       await new Promise(res => setTimeout(res, 1200));
     }
   }
-
   return executedAny;
 }
 
 // -------------------------------------------------------------------------
-// SPEECH RECOGNITION (MANUAL BUTTON)
+// SPEECH RECOGNITION (COMMAND CAPTURE)
 // -------------------------------------------------------------------------
 function startCommandListening() {
   if (!SpeechRecognition) {
@@ -277,7 +401,7 @@ function startCommandListening() {
 
   commandRecognition.onresult = async (event) => {
     const prompt = event.results[0][0].transcript;
-    updateUI(`"${prompt}"`, `Heard: "${prompt}"`);
+    updateUI(`"${prompt}"`, `Captured: "${prompt}"`);
 
     const wasHandled = await interceptLocalAction(prompt);
     if (wasHandled) {
@@ -288,6 +412,7 @@ function startCommandListening() {
     }
 
     setJarvisVisualState("THINKING");
+    playFuturisticChime("PROCESSING");
 
     try {
       const res = await fetch(WORKER_ENDPOINT, {
@@ -331,7 +456,6 @@ function resumeWakeEngine() {
   }
 }
 
-// Multilingual Speech Synthesizer
 function speakVoiceQuick(text) {
   if (!("speechSynthesis" in window)) return;
   window.speechSynthesis.cancel();
@@ -353,7 +477,7 @@ function speakVoiceQuick(text) {
 }
 
 // -------------------------------------------------------------------------
-// STRICT NOISE-FILTERED WAKE WORD ENGINE ("Hey Jarvis")
+// FUTURISTIC STRICT WAKE WORD ENGINE
 // -------------------------------------------------------------------------
 function initWakeWordEngine() {
   if (!SpeechRecognition) return;
@@ -368,15 +492,16 @@ function initWakeWordEngine() {
     const text = result[0].transcript.trim().toLowerCase();
     const confidence = result[0].confidence;
 
-    // 1. Ignore background hum / low-confidence audio noise
-    if (confidence && confidence < 0.65) {
-      return;
-    }
+    // Filter room noise/whispers
+    if (confidence && confidence < 0.65) return;
 
-    // 2. Strict Wake Word boundary check
     const wakeRegex = /\b(hey jarvis|jarvis|hai jarvis|ok jarvis|hi jarvis)\b/i;
 
     if (wakeRegex.test(text)) {
+      // 1. Audio chime & Stark double-pulse haptic feedback
+      playFuturisticChime("WAKE");
+      triggerHaptic("WAKE");
+
       updateUI("Yes Boss?", "Wake Word Authenticated");
       speakVoiceQuick("Yes Boss?");
       
@@ -387,16 +512,13 @@ function initWakeWordEngine() {
         startCommandListening();
       }
     } else {
-      // Ambient noise filtered without changing state
       const debug = document.getElementById("debugBox");
-      if (debug) debug.innerText = `Ignored Noise: "${text}"`;
+      if (debug) debug.innerText = `Ignored Ambient: "${text}"`;
     }
   };
 
   wakeRecognition.onerror = (e) => {
-    if (e.error !== "no-speech") {
-      console.warn("Wake recognizer status:", e.error);
-    }
+    if (e.error !== "no-speech") console.warn("Wake recognizer:", e.error);
   };
 
   wakeRecognition.onend = () => {
@@ -419,6 +541,8 @@ async function handleDirectCommand(prompt) {
   }
 
   setJarvisVisualState("THINKING");
+  playFuturisticChime("PROCESSING");
+
   try {
     const res = await fetch(WORKER_ENDPOINT, {
       method: "POST",
@@ -442,30 +566,37 @@ async function toggleWakeWord() {
 
   const btn = document.getElementById("wakeToggleBtn");
   const txt = document.getElementById("wakeBtnText");
+  const orb = document.getElementById("orbCore");
 
   if (!isWakeActive) {
-    await enableHardwareNoiseFiltering();
+    await startSpectralTelemetry();
     try {
       wakeRecognition.start();
       isWakeActive = true;
+      playFuturisticChime("WAKE");
+      triggerHaptic("WAKE");
+
       if (btn) btn.classList.add("active");
       if (txt) txt.innerText = "Wake Mode: ON";
-      updateUI("Wake Mode Active", "Listening strictly for 'Hey Jarvis'...");
+      if (orb) orb.classList.add("wake-active");
+      updateUI("Wake Telemetry Active", "Listening strictly for 'Hey Jarvis'...");
     } catch (err) {}
   } else {
     isWakeActive = false;
     try { wakeRecognition.stop(); } catch (e) {}
-    if (mediaStream) {
-      mediaStream.getTracks().forEach(track => track.stop());
-      mediaStream = null;
-    }
+    stopSpectralTelemetry();
+    playFuturisticChime("OFF");
+    triggerHaptic("OFF");
+
     if (btn) btn.classList.remove("active");
     if (txt) txt.innerText = "Wake Mode: OFF";
+    if (orb) orb.classList.remove("wake-active");
     updateUI("Ready for command, Boss.", "Wake Mode Off.");
     setJarvisVisualState("IDLE");
   }
 }
 
 function triggerManualListening() {
+  playFuturisticChime("PROCESSING");
   startCommandListening();
 }

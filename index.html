@@ -9,7 +9,7 @@
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <meta name="theme-color" content="#00ffff">
 
-  <link rel="stylesheet" href="style.css?v=20261011_hud">
+  <link rel="stylesheet" href="style.css?v=2026_universal_hud">
 </head>
 <body>
   <div class="jarvis-container">
@@ -28,7 +28,7 @@
         <div class="orb-inner"></div>
       </div>
       <div id="responseBox" class="terminal-box">Ready for command, Boss...</div>
-      <div id="debugBox" style="font-size: 11px; color: rgba(0,255,255,0.6); margin-top: 8px;">Waiting for audio input...</div>
+      <div id="debugBox" class="debug-subtext">Waiting for audio input...</div>
     </main>
 
     <footer class="bottom-bar">
@@ -36,28 +36,26 @@
     </footer>
   </div>
 
-  <!-- 1. Floating YouTube Music HUD Window -->
-  <div id="floatingMusicModal" class="floating-hud-modal">
+  <!-- Universal Multi-App HUD Modal -->
+  <div id="universalAppModal" class="floating-hud-modal">
     <div class="hud-header">
-      <span id="musicTitle">AUDIO STREAM // ACTIVE</span>
-      <button class="hud-close-btn" onclick="closeFloatingMusic()">✕</button>
+      <span id="appHudTitle">SYSTEM APP // ACTIVE</span>
+      <div class="hud-controls">
+        <a id="appPipLink" href="#" target="_blank" class="pip-btn">[OPEN APP]</a>
+        <button class="hud-close-btn" onclick="closeUniversalApp()">✕</button>
+      </div>
     </div>
     <div class="hud-body">
-      <iframe id="musicFrame" src="" allow="autoplay; encrypted-media" allowfullscreen loading="lazy"></iframe>
+      <iframe 
+        id="appHudFrame" 
+        src="" 
+        allow="autoplay; encrypted-media; picture-in-picture; geolocation; camera; microphone" 
+        allowfullscreen 
+        loading="lazy">
+      </iframe>
     </div>
   </div>
 
-  <!-- 2. Floating Navigation HUD Overlay -->
-  <div id="floatingMapModal" class="floating-hud-modal">
-    <div class="hud-header">
-      <span id="mapTitle">NAVIGATION HUD // ACTIVE</span>
-      <button class="hud-close-btn" onclick="closeFloatingMap()">✕</button>
-    </div>
-    <div class="hud-body">
-      <iframe id="mapFrame" src="" allowfullscreen loading="lazy"></iframe>
-    </div>
-  </div>
-
-  <script src="script.js?v=20261011_hud"></script>
+  <script src="script.js?v=2026_universal_hud"></script>
 </body>
 </html>

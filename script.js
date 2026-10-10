@@ -1,5 +1,5 @@
 // =========================================================================
-// J.A.R.V.I.S. MULTILINGUAL RUNTIME + UNIVERSAL HUD & APP DISPATCHER (V8)
+// J.A.R.V.I.S. MULTILINGUAL RUNTIME + MULTI-TASK & FAILOVER ENGINE
 // =========================================================================
 
 const WORKER_ENDPOINT = "https://jarvis-automation.saidamvamshi97.workers.dev/api/ask";
@@ -10,7 +10,7 @@ let commandRecognition = null;
 let isWakeActive = false;
 let isCommandActive = false;
 
-// Pre-warm browser audio synthesis on touch
+// Audio synthesis warmup
 window.addEventListener("touchstart", () => {
   if ("speechSynthesis" in window) {
     window.speechSynthesis.speak(new SpeechSynthesisUtterance(""));
@@ -84,38 +84,32 @@ function closeUniversalApp() {
 }
 
 // -------------------------------------------------------------------------
-// MULTILINGUAL FAST LOCAL INTENT INTERCEPTOR (<10ms)
+// MULTI-INTENT SEQUENTIAL COMMAND RUNNER
 // -------------------------------------------------------------------------
-function interceptLocalAction(rawPrompt) {
-  const p = rawPrompt.toLowerCase().trim();
+function splitMultiCommands(prompt) {
+  const delimiterRegex = /\b(and then|and also|then|and|mariyu|inka|aur|phir)\b|,/gi;
+  return prompt
+    .split(delimiterRegex)
+    .map(cmd => cmd.trim())
+    .filter(cmd => cmd.length > 2 && !cmd.match(/^(and|then|also|mariyu|inka|aur|phir)$/i));
+}
 
-  // 1. TIME / WATCH (Telugu, Hindi, Tamil, English)
-  const timeTriggers = [
-    "time", "watch", "clock", "samayam", "time entha", "samayam entha", 
-    "kya time", "samay", "neram", "kiti vaje", "ghadi", "mani enna"
-  ];
+function executeSingleAction(p) {
+  // 1. Time / Watch (Telugu, Hindi, Tamil, English)
+  const timeTriggers = ["time", "watch", "clock", "samayam", "time entha", "samay", "neram", "ghadi"];
   if (timeTriggers.some(w => p.includes(w))) {
     const timeStr = new Date().toLocaleTimeString("en-IN", { hour: "numeric", minute: "2-digit", hour12: true });
     const reply = `The time is ${timeStr}, Boss.`;
+    speakVoiceQuick(reply);
     updateUI(reply, "Action: Live Time Triggered");
-    speakVoiceQuick(reply);
     return true;
   }
 
-  // 2. CRICKET & IPL SCORES (Floating HUD)
-  if (p.includes("cricket") || p.includes("score") || p.includes("ipl") || p.includes("match")) {
-    const reply = "Streaming live cricket scorecard in HUD, Boss.";
-    updateUI(reply, "Dispatched: Cricket Scores");
-    speakVoiceQuick(reply);
-    openUniversalApp("Live Cricket", "https://m.cricbuzz.com/cricket-match/live-scores", "https://www.cricbuzz.com");
-    return true;
-  }
-
-  // 3. WEATHER RADAR (Floating HUD)
-  if (p.includes("weather") || p.includes("climate") || p.includes("rain") || p.includes("varsham") || p.includes("mausam")) {
+  // 2. Weather Radar HUD
+  if (p.includes("weather") || p.includes("rain") || p.includes("climate") || p.includes("varsham") || p.includes("mausam")) {
     const reply = "Loading atmospheric weather radar, Boss.";
-    updateUI(reply, "Dispatched: Weather Radar");
     speakVoiceQuick(reply);
+    updateUI(reply, "Dispatched: Weather Radar");
     openUniversalApp(
       "Weather Radar",
       "https://embed.windy.com/embed2.html?lat=16.36&lon=78.06&detailLat=16.36&detailLon=78.06&width=400&height=250&zoom=7&level=surface&overlay=radar&product=radar&menu=&message=&marker=&calendar=now&pressure=&type=map&location=coordinates&detail=&metricWind=km%2Fh&metricTemp=%C2%B0C&radarRange=-1",
@@ -124,22 +118,31 @@ function interceptLocalAction(rawPrompt) {
     return true;
   }
 
-  // 4. SCIENTIFIC CALCULATOR (Floating HUD)
-  if (p.includes("calculator") || p.includes("calculate") || p.includes("hisab") || p.includes("lekkalu")) {
-    const reply = "Opening calculator terminal, Boss.";
-    updateUI(reply, "Dispatched: Calculator");
+  // 3. Cricket Scorecard HUD
+  if (p.includes("cricket") || p.includes("score") || p.includes("ipl") || p.includes("match")) {
+    const reply = "Streaming live cricket scorecard in HUD, Boss.";
     speakVoiceQuick(reply);
+    updateUI(reply, "Dispatched: Cricket Scores");
+    openUniversalApp("Live Cricket", "https://m.cricbuzz.com/cricket-match/live-scores", "https://www.cricbuzz.com");
+    return true;
+  }
+
+  // 4. Calculator HUD
+  if (p.includes("calculator") || p.includes("calculate") || p.includes("lekkalu") || p.includes("hisab")) {
+    const reply = "Opening calculation core, Boss.";
+    speakVoiceQuick(reply);
+    updateUI(reply, "Dispatched: Calculator");
     openUniversalApp("Calculator", "https://www.desmos.com/scientific", "https://www.desmos.com/scientific");
     return true;
   }
 
-  // 5. WIKIPEDIA / INTEL SEARCH (Floating HUD)
+  // 5. Wikipedia Topic Intel
   if (p.startsWith("wiki") || p.startsWith("who is") || p.startsWith("what is")) {
     const topic = p.replace(/^(wiki|who is|what is|tell me about)/gi, "").trim();
     if (topic.length > 2) {
       const reply = `Retrieving intelligence on ${topic}, Boss.`;
-      updateUI(reply, `Dispatched: Wikipedia -> ${topic}`);
       speakVoiceQuick(reply);
+      updateUI(reply, `Dispatched: Wikipedia -> ${topic}`);
       openUniversalApp(
         `WIKI // ${topic}`,
         `https://en.m.wikipedia.org/wiki/${encodeURIComponent(topic)}`,
@@ -149,85 +152,89 @@ function interceptLocalAction(rawPrompt) {
     }
   }
 
-  // 6. MULTILINGUAL MUSIC ROUTING (YouTube App Intent or Spotify HUD)
+  // 6. Music & Video Dispatcher (YouTube App Intent or Spotify HUD)
   const musicTriggers = [
-    "play", "paly", "ply", "ple", "song", "songs", "paata", "paatalu", "pata", "patalu",
-    "gana", "gaana", "geet", "paatu", "padal", "paadal", "music", "youtube", "video",
-    "chiranjeevi", "prabhas", "bahubali", "pawan", "kalyan", "rebel", "salaar", "og", "devara",
-    "mahesh", "ntr", "allu arjun", "dsp", "thaman", "anirudh", "rajini", "kamal", "vijay", "spotify"
+    "play", "paly", "ply", "song", "songs", "paata", "paatalu", "music", "youtube", "spotify",
+    "chiranjeevi", "prabhas", "pawan", "kalyan", "rebel", "salaar", "dsp", "anirudh"
   ];
-
   if (musicTriggers.some(w => p.includes(w))) {
     let cleanQuery = p
       .replace(/when\s+(i\s+have\s+to|do\s+i|should\s+i)/gi, "")
       .replace(/how\s+(to|do\s+i)/gi, "")
       .replace(/^(hey jarvis|jarvis|please|bhayya|mama|bro|can you)/gi, "")
-      .replace(/\b(play|paly|ply|start|listen to|watch|open|choodu|vinu|pettu|lagao|chalao|podu)\b/gi, "")
+      .replace(/\b(play|paly|ply|start|listen to|watch|open|choodu|vinu|pettu|lagao|chalao)\b/gi, "")
       .replace(/\b(on youtube|in youtube|youtube|on spotify|spotify|lo|la)\b/gi, "")
       .trim();
 
-    if (!cleanQuery || ["song", "songs", "paata", "paatalu", "gaana", "paatu"].includes(cleanQuery)) {
+    if (!cleanQuery || ["song", "songs", "paata", "paatalu"].includes(cleanQuery)) {
       if (p.includes("chiranjeevi")) cleanQuery = "Chiranjeevi hit songs";
       else if (p.includes("prabhas")) cleanQuery = "Prabhas hit songs";
       else cleanQuery = "Telugu latest hit songs";
     }
 
-    // A. In-HUD Spotify Stream
     if (p.includes("spotify")) {
       const reply = `Streaming ${cleanQuery} on Spotify HUD, Boss.`;
-      updateUI(reply, `Dispatched: Spotify -> "${cleanQuery}"`);
       speakVoiceQuick(reply);
+      updateUI(reply, `Dispatched: Spotify -> "${cleanQuery}"`);
       openUniversalApp(
         `Spotify // ${cleanQuery}`,
         `https://open.spotify.com/embed/search/${encodeURIComponent(cleanQuery)}`,
         `spotify:search:${encodeURIComponent(cleanQuery)}`
       );
-      return true;
+    } else {
+      const reply = `Playing ${cleanQuery} on YouTube, Boss.`;
+      speakVoiceQuick(reply);
+      updateUI(reply, `Launching YouTube: "${cleanQuery}"`);
+      setTimeout(() => {
+        const intent = `intent://www.youtube.com/results?search_query=${encodeURIComponent(cleanQuery)}#Intent;scheme=https;package=com.google.android.youtube;end`;
+        const fallback = `https://www.youtube.com/results?search_query=${encodeURIComponent(cleanQuery)}`;
+        const opened = window.open(intent, "_blank");
+        if (!opened) window.location.href = fallback;
+      }, 600);
     }
-
-    // B. Native Android YouTube Intent (Supports Background & PiP Playback)
-    const reply = `Playing ${cleanQuery} on YouTube, Boss.`;
-    updateUI(reply, `Launching YouTube: "${cleanQuery}"`);
-    speakVoiceQuick(reply);
-
-    setTimeout(() => {
-      const youtubeIntent = `intent://www.youtube.com/results?search_query=${encodeURIComponent(cleanQuery)}#Intent;scheme=https;package=com.google.android.youtube;end`;
-      const fallbackUrl = `https://www.youtube.com/results?search_query=${encodeURIComponent(cleanQuery)}`;
-      
-      const opened = window.open(youtubeIntent, "_blank");
-      if (!opened) {
-        window.location.href = fallbackUrl;
-      }
-    }, 600);
-
     return true;
   }
 
-  // 7. NAVIGATION & MAPS (Floating HUD)
-  const navTriggers = ["navigate", "nivgate", "navgate", "route", "direction", "map", "raasta", "margam", "vazhi", "vellu"];
+  // 7. Navigation & Maps
+  const navTriggers = ["navigate", "route", "direction", "map", "raasta", "margam", "vellu"];
   if (navTriggers.some(w => p.includes(w))) {
-    let dest = p
-      .replace(/.*(?:navigate to|nivgate to|navgate to|route to|map to|go to|vellu|jaana)/gi, "")
-      .replace(/^(hey jarvis|jarvis)/gi, "")
-      .trim();
-
-    if (!dest) dest = "Mancherial";
+    let dest = p.replace(/.*(?:navigate to|route to|map to|go to|vellu)/gi, "").replace(/^(hey jarvis|jarvis)/gi, "").trim();
+    if (!dest) dest = "Wanaparthy";
 
     const reply = `Plotting route to ${dest}, Boss.`;
-    updateUI(reply, `Dispatched Navigation: "${dest}"`);
     speakVoiceQuick(reply);
-
-    const mapEmbed = `https://maps.google.com/maps?q=${encodeURIComponent(dest)}&t=&z=13&ie=UTF8&iwloc=&output=embed`;
-    const mapApp = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(dest)}`;
-    openUniversalApp(`Route: ${dest}`, mapEmbed, mapApp);
+    updateUI(reply, `Dispatched Navigation: "${dest}"`);
+    openUniversalApp(`Route: ${dest}`, `https://maps.google.com/maps?q=${encodeURIComponent(dest)}&t=&z=13&ie=UTF8&iwloc=&output=embed`, `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(dest)}`);
     return true;
   }
 
   return false;
 }
 
+async function interceptLocalAction(rawPrompt) {
+  const commands = splitMultiCommands(rawPrompt);
+
+  if (commands.length <= 1) {
+    return executeSingleAction(rawPrompt.toLowerCase());
+  }
+
+  updateUI(`Executing ${commands.length} tasks...`, `Chained Intent: ${commands.join(" -> ")}`);
+  let executedAny = false;
+
+  for (let i = 0; i < commands.length; i++) {
+    const cmd = commands[i].toLowerCase();
+    const handled = executeSingleAction(cmd);
+    if (handled) executedAny = true;
+    if (i < commands.length - 1) {
+      await new Promise(res => setTimeout(res, 1200));
+    }
+  }
+
+  return executedAny;
+}
+
 // -------------------------------------------------------------------------
-// SPEECH RECOGNITION & GEMINI WORKER ROUTER
+// SPEECH RECOGNITION & BACKEND FAILOVER ROUTER
 // -------------------------------------------------------------------------
 function startCommandListening() {
   if (!SpeechRecognition) {
@@ -246,20 +253,21 @@ function startCommandListening() {
   commandRecognition = new SpeechRecognition();
   commandRecognition.continuous = false;
   commandRecognition.interimResults = false;
-  commandRecognition.lang = "en-IN"; // Accurately captures regional names & transliterations
+  commandRecognition.lang = "en-IN"; // Accurately captures regional names & accents
 
   commandRecognition.onresult = async (event) => {
     const prompt = event.results[0][0].transcript;
     updateUI(`"${prompt}"`, `Heard: "${prompt}"`);
 
-    // 1. Check local fast-path actions
-    if (interceptLocalAction(prompt)) {
+    // 1. Intercept fast local actions & multi-tasks
+    const wasHandled = await interceptLocalAction(prompt);
+    if (wasHandled) {
       setJarvisVisualState("IDLE");
       isCommandActive = false;
       return;
     }
 
-    // 2. Query Cloudflare Gemini Worker
+    // 2. Query Cloudflare Backend (Gemini with silent failover to Groq/Llama)
     setJarvisVisualState("THINKING");
 
     try {
@@ -270,7 +278,7 @@ function startCommandListening() {
       });
       const data = await res.json();
       const reply = data.reply || "Done, Boss.";
-      updateUI(reply, "Cloudflare Gemini Answered");
+      updateUI(reply, "Cloud AI Answered");
       speakVoiceQuick(reply);
     } catch (err) {
       updateUI("Systems link timeout, Boss.", `Error: ${err.message}`);

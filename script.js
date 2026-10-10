@@ -1,9 +1,8 @@
 // =========================================================================
-// J.A.R.V.I.S. ULTRA-FAST INTENT & PHONETIC ACTION ENGINE
+// J.A.R.V.I.S. ZERO-LATENCY INTENT & DEVICE DISPATCH ENGINE (V5)
 // =========================================================================
 
 const WORKER_ENDPOINT = "https://jarvis-automation.saidamvamshi97.workers.dev/api/ask";
-
 const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
 
 let wakeRecognition = null;
@@ -11,7 +10,7 @@ let commandRecognition = null;
 let isWakeActive = false;
 let isCommandActive = false;
 
-// Pre-warm browser audio synthesis
+// Audio synthesis initialization
 window.addEventListener("touchstart", () => {
   if ("speechSynthesis" in window) {
     window.speechSynthesis.speak(new SpeechSynthesisUtterance(""));
@@ -42,42 +41,27 @@ function setJarvisVisualState(state) {
   }
 }
 
-// Zero-Latency Local Action Interceptor (< 15ms Execution)
+// 1. High-Priority Intent Matcher (<10ms)
 function interceptLocalAction(rawPrompt) {
   const p = rawPrompt.toLowerCase().trim();
 
-  // 1. Instant Watch / Clock / Time Interceptor
-  if (
-    p.includes("watch") || 
-    p.includes("time") || 
-    p.includes("clock") || 
-    p.includes("samayam") ||
-    p.includes("time entha")
-  ) {
-    const now = new Date();
-    const timeStr = now.toLocaleTimeString("en-IN", {
-      hour: "numeric",
-      minute: "2-digit",
-      hour12: true
-    });
-    const message = `The time is ${timeStr}, Boss.`;
-    const box = document.getElementById("responseBox");
-    if (box) box.innerText = message;
-    speakVoiceQuick(message);
+  // A. Time & Clock
+  if (p.includes("time") || p.includes("watch") || p.includes("clock") || p.includes("samayam") || p.includes("entha")) {
+    const timeStr = new Date().toLocaleTimeString("en-IN", { hour: "numeric", minute: "2-digit", hour12: true });
+    const reply = `The time is ${timeStr}, Boss.`;
+    document.getElementById("responseBox").innerText = reply;
+    speakVoiceQuick(reply);
     return true;
   }
 
-  // 2. Greedy Media & YouTube Interceptor (Handles Chiranjeevi, songs, play, etc.)
-  const musicTriggers = [
+  // B. Media & YouTube Dispatch
+  const isMedia = [
     "play", "paly", "ply", "song", "songs", "music", "youtube", "video",
-    "chiranjeevi", "prabhas", "bahubali", "pawan", "kalyan", "ntr", "mahesh", "allu arjun"
-  ];
+    "chiranjeevi", "prabhas", "bahubali", "pawan", "kalyan", "rebel", "salaar", "og"
+  ].some(term => p.includes(term));
 
-  const hasMusicIntent = musicTriggers.some(word => p.includes(word));
-
-  if (hasMusicIntent) {
-    // Strip common filler noise and question words cleanly
-    let query = p
+  if (isMedia) {
+    let cleanQuery = p
       .replace(/when\s+(i\s+have\s+to|do\s+i|should\s+i)/gi, "")
       .replace(/how\s+(to|do\s+i)/gi, "")
       .replace(/^(hey jarvis|jarvis|please|can you|could you|want to)/gi, "")
@@ -85,57 +69,47 @@ function interceptLocalAction(rawPrompt) {
       .replace(/\b(on youtube|in youtube|youtube)\b/gi, "")
       .trim();
 
-    if (!query || query === "songs" || query === "song") {
-      if (p.includes("chiranjeevi")) query = "Chiranjeevi songs";
-      else if (p.includes("prabhas")) query = "Prabhas songs";
-      else query = "Telugu hit songs";
+    if (!cleanQuery || cleanQuery === "song" || cleanQuery === "songs") {
+      if (p.includes("chiranjeevi")) cleanQuery = "Chiranjeevi hit songs";
+      else if (p.includes("prabhas")) cleanQuery = "Prabhas hit songs";
+      else cleanQuery = "Telugu latest hit songs";
     }
 
-    const box = document.getElementById("responseBox");
-    if (box) box.innerText = `Playing ${query} on YouTube...`;
-    speakVoiceQuick(`Playing ${query} on YouTube, Boss.`);
+    const feedback = `Playing ${cleanQuery} on YouTube, Boss.`;
+    document.getElementById("responseBox").innerText = feedback;
+    speakVoiceQuick(feedback);
 
     setTimeout(() => {
-      window.location.href = `https://www.youtube.com/results?search_query=${encodeURIComponent(query)}`;
+      const url = `https://www.youtube.com/results?search_query=${encodeURIComponent(cleanQuery)}`;
+      // Window.open avoids PWA redirection locks on Android
+      const opened = window.open(url, "_blank");
+      if (!opened) {
+        window.location.href = url;
+      }
     }, 600);
     return true;
   }
 
-  // 3. Navigation & Floating Maps Interceptor
-  if (
-    p.includes("navigate") || 
-    p.includes("nivgate") || 
-    p.includes("navgate") || 
-    p.includes("direction") || 
-    p.includes("route") || 
-    p.includes("map")
-  ) {
-    let dest = p
-      .replace(/.*(?:navigate to|nivgate to|navgate to|route to|map to|directions to|go to)/gi, "")
-      .replace(/^(hey jarvis|jarvis)/gi, "")
-      .trim();
-
+  // C. Navigation & Maps
+  if (p.includes("navigate") || p.includes("nivgate") || p.includes("navgate") || p.includes("route") || p.includes("direction") || p.includes("map")) {
+    let dest = p.replace(/.*(?:navigate to|nivgate to|navgate to|route to|map to|go to)/gi, "").trim();
     if (!dest) dest = "Mancherial";
 
-    const box = document.getElementById("responseBox");
-    if (box) box.innerText = `Plotting route to ${dest}...`;
-    speakVoiceQuick(`Plotting route to ${dest}, Boss.`);
+    const feedback = `Plotting route to ${dest}, Boss.`;
+    document.getElementById("responseBox").innerText = feedback;
+    speakVoiceQuick(feedback);
     openFloatingMap(dest);
     return true;
   }
 
-  // 4. Google Search Interceptor
-  if (p.includes("google") || p.includes("search")) {
-    const q = p
-      .replace(/.*(?:search google for|google search|search for|google)/gi, "")
-      .trim();
-
-    const box = document.getElementById("responseBox");
-    if (box) box.innerText = `Searching Google for ${q}...`;
-    speakVoiceQuick(`Searching Google for ${q}`);
-
+  // D. Google Search
+  if (p.includes("search") || p.includes("google")) {
+    const q = p.replace(/.*(?:search google for|google search|search for|google)/gi, "").trim();
+    const feedback = `Searching Google for ${q}, Boss.`;
+    document.getElementById("responseBox").innerText = feedback;
+    speakVoiceQuick(feedback);
     setTimeout(() => {
-      window.location.href = `https://www.google.com/search?q=${encodeURIComponent(q)}`;
+      window.open(`https://www.google.com/search?q=${encodeURIComponent(q)}`, "_blank");
     }, 600);
     return true;
   }
@@ -143,19 +117,14 @@ function interceptLocalAction(rawPrompt) {
   return false;
 }
 
-// Floating HUD Map Controls
+// In-App Navigation HUD
 function openFloatingMap(destination) {
   const modal = document.getElementById("floatingMapModal");
   const frame = document.getElementById("mapFrame");
   const title = document.getElementById("mapTitle");
-
   if (title) title.innerText = `NAVIGATION HUD // ${destination.toUpperCase()}`;
-  if (frame) {
-    frame.src = `https://maps.google.com/maps?q=${encodeURIComponent(destination)}&t=&z=13&ie=UTF8&iwloc=&output=embed`;
-  }
-  if (modal) {
-    modal.style.display = "flex";
-  }
+  if (frame) frame.src = `https://maps.google.com/maps?q=${encodeURIComponent(destination)}&t=&z=13&ie=UTF8&iwloc=&output=embed`;
+  if (modal) modal.style.display = "flex";
 }
 
 function closeFloatingMap() {
@@ -166,42 +135,12 @@ function closeFloatingMap() {
   setJarvisVisualState("IDLE");
 }
 
-// Hotword Wake Engine ("Hey Jarvis")
-function initWakeWordEngine() {
-  if (!SpeechRecognition) return;
-
-  wakeRecognition = new SpeechRecognition();
-  wakeRecognition.continuous = true;
-  wakeRecognition.interimResults = false;
-  wakeRecognition.lang = "en-IN";
-
-  wakeRecognition.onresult = (event) => {
-    const text = event.results[event.resultIndex][0].transcript.trim().toLowerCase();
-    if (text.includes("hey jarvis") || text.includes("jarvis") || text.includes("hai jarvis")) {
-      speakVoiceQuick("Yes Boss?");
-      startCommandListening();
-    }
-  };
-
-  wakeRecognition.onerror = (e) => {
-    if (e.error === "not-allowed") {
-      const box = document.getElementById("responseBox");
-      if (box) box.innerText = "Mic blocked. Allow microphone permissions in browser settings.";
-    }
-  };
-
-  wakeRecognition.onend = () => {
-    if (isWakeActive && !isCommandActive) {
-      setTimeout(() => {
-        try { wakeRecognition.start(); } catch (e) {}
-      }, 300);
-    }
-  };
-}
-
-// User Command Listener
+// 2. Command Capture & Fallback Router
 function startCommandListening() {
-  if (!SpeechRecognition) return;
+  if (!SpeechRecognition) {
+    alert("SpeechRecognition unsupported. Use Chrome.");
+    return;
+  }
 
   isCommandActive = true;
   if (wakeRecognition && isWakeActive) {
@@ -210,7 +149,9 @@ function startCommandListening() {
 
   setJarvisVisualState("LISTENING");
   const box = document.getElementById("responseBox");
-  if (box) box.innerText = "Listening...";
+  const debug = document.getElementById("debugBox");
+  box.innerText = "Listening...";
+  if (debug) debug.innerText = "Listening for audio...";
 
   commandRecognition = new SpeechRecognition();
   commandRecognition.continuous = false;
@@ -219,9 +160,8 @@ function startCommandListening() {
 
   commandRecognition.onresult = async (event) => {
     const prompt = event.results[0][0].transcript;
-    if (box) box.innerText = `"${prompt}"`;
+    if (debug) debug.innerText = `Transcript: "${prompt}"`;
 
-    // Local action bypass (<15ms)
     if (interceptLocalAction(prompt)) {
       setJarvisVisualState("IDLE");
       isCommandActive = false;
@@ -230,7 +170,6 @@ function startCommandListening() {
 
     setJarvisVisualState("THINKING");
 
-    // Route to Cloudflare Worker + Gemini AI
     try {
       const res = await fetch(WORKER_ENDPOINT, {
         method: "POST",
@@ -238,11 +177,11 @@ function startCommandListening() {
         body: JSON.stringify({ prompt })
       });
       const data = await res.json();
-      const answer = data.reply || "Done, Boss.";
-      if (box) box.innerText = answer;
-      speakVoiceQuick(answer);
+      const reply = data.reply || "Done, Boss.";
+      box.innerText = reply;
+      speakVoiceQuick(reply);
     } catch (err) {
-      if (box) box.innerText = "Systems link timeout.";
+      box.innerText = "Systems link timeout.";
     }
 
     setJarvisVisualState("IDLE");
@@ -251,6 +190,7 @@ function startCommandListening() {
   };
 
   commandRecognition.onerror = (e) => {
+    if (debug) debug.innerText = `Error: ${e.error}`;
     setJarvisVisualState("IDLE");
     isCommandActive = false;
     resumeWakeEngine();
@@ -272,7 +212,6 @@ function resumeWakeEngine() {
   }
 }
 
-// Fast Speech Synthesizer (1.15x speed to eliminate audio lag)
 function speakVoiceQuick(text) {
   if (!("speechSynthesis" in window)) return;
   window.speechSynthesis.cancel();
@@ -281,6 +220,35 @@ function speakVoiceQuick(text) {
   utterance.rate = 1.15;
   utterance.pitch = 1.0;
   window.speechSynthesis.speak(utterance);
+}
+
+// 3. Hotword Engine
+function initWakeWordEngine() {
+  if (!SpeechRecognition) return;
+
+  wakeRecognition = new SpeechRecognition();
+  wakeRecognition.continuous = true;
+  wakeRecognition.interimResults = false;
+  wakeRecognition.lang = "en-IN";
+
+  wakeRecognition.onresult = (event) => {
+    const text = event.results[event.resultIndex][0].transcript.trim().toLowerCase();
+    const debug = document.getElementById("debugBox");
+    if (debug) debug.innerText = `Wake Audio: "${text}"`;
+
+    if (text.includes("hey jarvis") || text.includes("jarvis") || text.includes("hai jarvis")) {
+      speakVoiceQuick("Yes Boss?");
+      startCommandListening();
+    }
+  };
+
+  wakeRecognition.onend = () => {
+    if (isWakeActive && !isCommandActive) {
+      setTimeout(() => {
+        try { wakeRecognition.start(); } catch (e) {}
+      }, 300);
+    }
+  };
 }
 
 function toggleWakeWord() {
@@ -296,25 +264,18 @@ function toggleWakeWord() {
       isWakeActive = true;
       if (btn) btn.classList.add("active");
       if (txt) txt.innerText = "Wake Mode: ON";
-      if (box) box.innerText = "Say 'Hey Jarvis'...";
+      box.innerText = "Wake Mode active. Say 'Hey Jarvis'...";
     } catch (err) {}
   } else {
     isWakeActive = false;
     try { wakeRecognition.stop(); } catch (e) {}
     if (btn) btn.classList.remove("active");
     if (txt) txt.innerText = "Wake Mode: OFF";
-    if (box) box.innerText = "Ready for command, Boss...";
+    box.innerText = "Ready, Boss.";
     setJarvisVisualState("IDLE");
   }
 }
 
 function triggerManualListening() {
   startCommandListening();
-}
-
-// Service Worker Cache
-if ("serviceWorker" in navigator) {
-  window.addEventListener("load", () => {
-    navigator.serviceWorker.register("./sw.js").catch(() => {});
-  });
 }

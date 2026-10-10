@@ -1,5 +1,5 @@
 // =========================================================================
-// J.A.R.V.I.S. PRO FRONTEND SPEECH & DEVICE CONTROL ENGINE
+// J.A.R.V.I.S. ZERO-LAG CLIENT ENGINE
 // =========================================================================
 
 const WORKER_ENDPOINT = "https://jarvis-automation.saidamvamshi97.workers.dev/api/ask";
@@ -8,36 +8,37 @@ let wakeRecognition = null;
 let commandRecognition = null;
 let isWakeActive = false;
 
-// 1. Dynamic Orb Visual Indicator
+// Pre-warm Speech Synthesis on initial interaction
+window.addEventListener("touchstart", () => {
+  if ("speechSynthesis" in window) {
+    window.speechSynthesis.speak(new SpeechSynthesisUtterance(""));
+  }
+}, { once: true });
+
 function setJarvisVisualState(state) {
   const orb = document.querySelector(".orb-inner");
   const ring = document.querySelector(".orb-ring");
-  const glow = document.querySelector(".orb-glow");
   if (!orb) return;
 
   if (state === "IDLE") {
     orb.style.backgroundColor = "#00ffff";
     orb.style.boxShadow = "0 0 25px #00ffff";
     if (ring) ring.style.borderColor = "#00ffff";
-    if (glow) glow.style.background = "radial-gradient(circle, rgba(0,255,255,0.4) 0%, rgba(0,255,255,0) 70%)";
   } else if (state === "LISTENING") {
     orb.style.backgroundColor = "#00ff77";
     orb.style.boxShadow = "0 0 35px #00ff77";
     if (ring) ring.style.borderColor = "#00ff77";
-    if (glow) glow.style.background = "radial-gradient(circle, rgba(0,255,119,0.5) 0%, rgba(0,255,119,0) 70%)";
   } else if (state === "THINKING") {
     orb.style.backgroundColor = "#ff9900";
     orb.style.boxShadow = "0 0 40px #ff9900";
     if (ring) ring.style.borderColor = "#ff9900";
-    if (glow) glow.style.background = "radial-gradient(circle, rgba(255,153,0,0.5) 0%, rgba(255,153,0) 0%)";
   }
 }
 
-// 2. Intent Action Router (Executes Native Apps & Actions)
-function handleActionCommands(rawPrompt) {
+// Zero-Latency Local Action Interceptor (< 50ms)
+function interceptLocalAction(rawPrompt) {
   const p = rawPrompt.toLowerCase().trim();
 
-  // YouTube Launch & Search
   if (p.includes("youtube") || p.includes("play song") || p.includes("song play")) {
     let query = "";
     if (p.includes("play")) {
@@ -46,37 +47,28 @@ function handleActionCommands(rawPrompt) {
       query = p.replace(/.*search/, "").replace("on youtube", "").trim();
     }
 
-    displayAndSpeak(
-      query ? `Searching YouTube for "${query}", Boss.` : "Opening YouTube, Boss.",
-      () => {
-        const dest = query 
-          ? `https://www.youtube.com/results?search_query=${encodeURIComponent(query)}` 
-          : "https://www.youtube.com";
-        window.location.href = dest;
-      }
-    );
+    const text = query ? `Opening YouTube for ${query}` : "Opening YouTube";
+    speakVoiceQuick(text);
+    const dest = query 
+      ? `https://www.youtube.com/results?search_query=${encodeURIComponent(query)}` 
+      : "https://www.youtube.com";
+    setTimeout(() => { window.location.href = dest; }, 600);
     return true;
   }
 
-  // Google Search
   if (p.includes("search google") || p.includes("google search") || p.startsWith("google ")) {
-    const query = p.replace("search google for", "").replace("google search", "").replace("google", "").trim();
-    displayAndSpeak(`Searching Google for ${query}, Boss.`, () => {
-      window.location.href = `https://www.google.com/search?q=${encodeURIComponent(query)}`;
-    });
+    const q = p.replace("search google for", "").replace("google search", "").replace("google", "").trim();
+    speakVoiceQuick(`Searching Google for ${q}`);
+    setTimeout(() => {
+      window.location.href = `https://www.google.com/search?q=${encodeURIComponent(q)}`;
+    }, 600);
     return true;
   }
 
   return false;
 }
 
-function displayAndSpeak(text, onComplete) {
-  const box = document.getElementById("responseBox");
-  if (box) box.innerText = text;
-  speakVoice(text, onComplete);
-}
-
-// 3. Hotword Listener ("Hey Jarvis")
+// "Hey Jarvis" Wake Detector
 function initWakeWordEngine() {
   const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
   if (!SpeechRecognition) return;
@@ -87,13 +79,10 @@ function initWakeWordEngine() {
   wakeRecognition.lang = "en-IN";
 
   wakeRecognition.onresult = (event) => {
-    const current = event.resultIndex;
-    const text = event.results[current][0].transcript.trim().toLowerCase();
-    console.log("[Wake Mic Heard]:", text);
-
-    if (text.includes("hey jarvis") || text.includes("jarvis") || text.includes("hai jarvis") || text.includes("service")) {
-      console.log("Wake word recognized!");
-      displayAndSpeak("Yes Boss, listening.", () => startCommandListening());
+    const text = event.results[event.resultIndex][0].transcript.trim().toLowerCase();
+    if (text.includes("hey jarvis") || text.includes("jarvis") || text.includes("hai jarvis")) {
+      speakVoiceQuick("Yes Boss?");
+      startCommandListening();
     }
   };
 
@@ -104,7 +93,7 @@ function initWakeWordEngine() {
   };
 }
 
-// 4. Command Listener
+// Rapid Command Listener
 function startCommandListening() {
   const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
   if (!SpeechRecognition) return;
@@ -115,7 +104,7 @@ function startCommandListening() {
 
   setJarvisVisualState("LISTENING");
   const box = document.getElementById("responseBox");
-  if (box) box.innerText = "Listening to your command...";
+  if (box) box.innerText = "Listening...";
 
   commandRecognition = new SpeechRecognition();
   commandRecognition.continuous = false;
@@ -125,73 +114,61 @@ function startCommandListening() {
   commandRecognition.onresult = async (event) => {
     const prompt = event.results[0][0].transcript;
     if (box) box.innerText = `"${prompt}"`;
-    setJarvisVisualState("THINKING");
 
-    // Check device actions first
-    if (handleActionCommands(prompt)) {
+    // Local command bypass
+    if (interceptLocalAction(prompt)) {
       setJarvisVisualState("IDLE");
       return;
     }
 
-    // Call Cloudflare Worker AI Engine
+    setJarvisVisualState("THINKING");
+
+    // Fast Fetch
     try {
       const res = await fetch(WORKER_ENDPOINT, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ prompt: prompt })
+        body: JSON.stringify({ prompt })
       });
       const data = await res.json();
       const answer = data.reply || "Done, Boss.";
-      displayAndSpeak(answer);
+      if (box) box.innerText = answer;
+      speakVoiceQuick(answer);
     } catch (err) {
-      displayAndSpeak("Systems link timeout, Boss.");
+      if (box) box.innerText = "Connection lost.";
     }
 
     setJarvisVisualState("IDLE");
-    restartWakeIfActive();
+    resumeWake();
   };
 
-  commandRecognition.onerror = (e) => {
-    console.warn("Recognition error:", e);
+  commandRecognition.onerror = () => {
     setJarvisVisualState("IDLE");
-    restartWakeIfActive();
+    resumeWake();
   };
 
   try { commandRecognition.start(); } catch (e) {}
 }
 
-function restartWakeIfActive() {
+function resumeWake() {
   if (isWakeActive && wakeRecognition) {
     setTimeout(() => {
       try { wakeRecognition.start(); } catch (e) {}
-    }, 500);
+    }, 400);
   }
 }
 
-// 5. High-Fidelity Speech Synthesizer
-function speakVoice(text, callback) {
-  if (!("speechSynthesis" in window)) {
-    if (callback) callback();
-    return;
-  }
-
+// Fast Speech Synthesizer (Higher rate for quicker audio output)
+function speakVoiceQuick(text) {
+  if (!("speechSynthesis" in window)) return;
   window.speechSynthesis.cancel();
   const utterance = new SpeechSynthesisUtterance(text);
   utterance.lang = "en-IN";
-  utterance.rate = 1.05;
-  utterance.pitch = 0.95;
-
-  utterance.onend = () => {
-    if (callback) callback();
-  };
-  utterance.onerror = () => {
-    if (callback) callback();
-  };
-
+  utterance.rate = 1.15; // 15% faster speech output
+  utterance.pitch = 1.0;
   window.speechSynthesis.speak(utterance);
 }
 
-// 6. Wake Mode Controller
 function toggleWakeWord() {
   if (!wakeRecognition) initWakeWordEngine();
 
@@ -212,18 +189,11 @@ function toggleWakeWord() {
     try { wakeRecognition.stop(); } catch (e) {}
     if (btn) btn.classList.remove("active");
     if (txt) txt.innerText = "Wake Mode: OFF";
-    if (box) box.innerText = "Ready for command, Boss...";
+    if (box) box.innerText = "Ready, Boss.";
     setJarvisVisualState("IDLE");
   }
 }
 
 function triggerManualListening() {
   startCommandListening();
-}
-
-// Service Worker Cache Registration
-if ("serviceWorker" in navigator) {
-  window.addEventListener("load", () => {
-    navigator.serviceWorker.register("./sw.js").catch(() => {});
-  });
 }

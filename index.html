@@ -1,387 +1,42 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
-  <title>J.A.R.V.I.S - Autonomous Quantum HUD</title>
-  
-  <!-- EXTERNAL CSS LINK -->
-  <link rel="stylesheet" href="style.css" />
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>J.A.R.V.I.S Core</title>
 
-  <!-- EMBEDDED FAIL-SAFE STYLING (PREVENTS WHITE-SCREEN RENDERING ISSUES) -->
-  <style>
-    * {
-      margin: 0;
-      padding: 0;
-      box-sizing: border-box;
-      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Courier New", monospace;
-      -webkit-tap-highlight-color: transparent;
-    }
-    body {
-      background: radial-gradient(circle at 50% 15%, #051a2e 0%, #010a14 65%, #000407 100%) !important;
-      background-color: #010a14 !important;
-      color: #00f0ff !important;
-      min-height: 100vh;
-      display: flex;
-      justify-content: center;
-      align-items: flex-start;
-      overflow-x: hidden;
-      padding-bottom: 25px;
-    }
-    .hud-container {
-      width: 100%;
-      max-width: 440px;
-      min-height: 100vh;
-      display: flex;
-      flex-direction: column;
-      padding: 14px 14px 22px 14px;
-      position: relative;
-    }
-    .hud-top-meta {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      font-size: 0.65rem;
-      letter-spacing: 2px;
-      color: rgba(0, 240, 255, 0.7);
-      margin-bottom: 4px;
-    }
-    .system-badge {
-      background: rgba(0, 240, 255, 0.1);
-      border: 1px solid rgba(0, 240, 255, 0.3);
-      padding: 2px 6px;
-      border-radius: 4px;
-      color: #00ffaa;
-    }
-    header {
-      text-align: center;
-      margin-bottom: 10px;
-    }
-    h1.glitch {
-      font-size: 2.3rem;
-      font-weight: 900;
-      letter-spacing: 8px;
-      color: #00f0ff;
-      text-shadow: 0 0 16px rgba(0, 240, 255, 0.9), 0 0 35px rgba(0, 240, 255, 0.45);
-    }
-    .status-text {
-      font-size: 0.7rem;
-      letter-spacing: 3.5px;
-      color: #00ffaa;
-      opacity: 0.9;
-      text-shadow: 0 0 8px rgba(0, 255, 170, 0.6);
-      margin-top: 3px;
-    }
-    .reactor-container {
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      justify-content: center;
-      margin: 6px 0 14px 0;
-    }
-    .arc-reactor {
-      width: 124px;
-      height: 124px;
-      position: relative;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-    }
-    .ring {
-      position: absolute;
-      border-radius: 50%;
-      border: 2px solid transparent;
-    }
-    .ring.outer {
-      width: 120px;
-      height: 120px;
-      border-top: 2.5px solid #00f0ff;
-      border-bottom: 2.5px solid #00f0ff;
-      box-shadow: 0 0 20px rgba(0, 240, 255, 0.45);
-      animation: spinCW 8s linear infinite;
-    }
-    .ring.middle {
-      width: 94px;
-      height: 94px;
-      border-left: 2px solid rgba(0, 240, 255, 0.85);
-      border-right: 2px solid rgba(0, 240, 255, 0.85);
-      animation: spinCCW 5s linear infinite;
-    }
-    .ring.inner {
-      width: 70px;
-      height: 70px;
-      border: 1.5px dashed rgba(0, 255, 170, 0.7);
-      animation: spinCW 3.5s linear infinite;
-    }
-    .center {
-      width: 44px;
-      height: 44px;
-      background: radial-gradient(circle, #e0ffff 10%, #00e5ff 60%, rgba(0, 229, 255, 0.2) 100%);
-      border-radius: 50%;
-      box-shadow: 0 0 30px #00f0ff, 0 0 55px rgba(0, 240, 255, 0.9);
-      transition: all 0.3s ease;
-    }
-    .reactor-status {
-      margin-top: 8px;
-      font-size: 0.68rem;
-      letter-spacing: 2px;
-      color: #00f0ff;
-      opacity: 0.85;
-    }
-    @keyframes spinCW {
-      from { transform: rotate(0deg); }
-      to { transform: rotate(360deg); }
-    }
-    @keyframes spinCCW {
-      from { transform: rotate(360deg); }
-      to { transform: rotate(0deg); }
-    }
-    .diagnostic-panel {
-      background: rgba(3, 20, 36, 0.35);
-      backdrop-filter: blur(14px);
-      -webkit-backdrop-filter: blur(14px);
-      border: 1px solid rgba(0, 240, 255, 0.25);
-      border-radius: 12px;
-      padding: 8px 12px;
-      margin-bottom: 12px;
-      font-size: 0.72rem;
-      box-shadow: 0 8px 30px rgba(0, 0, 0, 0.45);
-    }
-    .panel-header {
-      font-weight: bold;
-      letter-spacing: 1.5px;
-      margin-bottom: 5px;
-      display: flex;
-      justify-content: space-between;
-      color: #00f0ff;
-    }
-    #ping-indicator {
-      font-size: 0.65rem;
-      color: #00ffaa;
-    }
-    .telemetry-row {
-      display: flex;
-      justify-content: space-between;
-      margin: 3px 0;
-      color: rgba(200, 245, 255, 0.85);
-    }
-    .val-ok {
-      color: #00ffaa;
-      font-weight: bold;
-    }
-    .terminal-chat {
-      flex: 1;
-      min-height: 220px;
-      max-height: 280px;
-      background: rgba(2, 14, 26, 0.42);
-      backdrop-filter: blur(16px);
-      -webkit-backdrop-filter: blur(16px);
-      border: 1px solid rgba(0, 240, 255, 0.25);
-      border-radius: 12px;
-      padding: 10px;
-      overflow-y: auto;
-      display: flex;
-      flex-direction: column;
-      gap: 10px;
-      margin-bottom: 12px;
-      box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
-    }
-    .msg {
-      padding: 8px 11px;
-      border-radius: 8px;
-      font-size: 0.82rem;
-      line-height: 1.45;
-      word-break: break-word;
-    }
-    .msg.ai {
-      background: rgba(0, 240, 255, 0.08);
-      border-left: 3px solid #00f0ff;
-      border-top: 1px solid rgba(0, 240, 255, 0.15);
-      color: #d8faff;
-    }
-    .msg.user {
-      background: rgba(0, 255, 170, 0.06);
-      border-left: 3px solid #00ffaa;
-      border-top: 1px solid rgba(0, 255, 170, 0.15);
-      color: #eefdff;
-    }
-    .prefix { font-weight: bold; letter-spacing: 1px; }
-    .msg.ai .prefix { color: #00f0ff; }
-    .msg.user .prefix { color: #00ffaa; }
-    .command-bar {
-      display: flex;
-      align-items: center;
-      gap: 6px;
-      width: 100%;
-    }
-    .command-bar input {
-      flex: 1;
-      height: 42px;
-      background: rgba(3, 18, 32, 0.5);
-      backdrop-filter: blur(12px);
-      -webkit-backdrop-filter: blur(12px);
-      border: 1px solid rgba(0, 240, 255, 0.35);
-      border-radius: 8px;
-      color: #00f0ff;
-      padding: 0 10px;
-      font-size: 0.82rem;
-      outline: none;
-    }
-    .command-bar input:focus {
-      border-color: #00ffaa;
-      box-shadow: 0 0 12px rgba(0, 255, 170, 0.4);
-    }
-    .command-bar button {
-      height: 42px;
-      background: rgba(3, 20, 36, 0.4);
-      backdrop-filter: blur(12px);
-      -webkit-backdrop-filter: blur(12px);
-      border: 1px solid rgba(0, 240, 255, 0.35);
-      border-radius: 8px;
-      color: #00f0ff;
-      font-size: 0.95rem;
-      padding: 0 10px;
-      cursor: pointer;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      flex-shrink: 0;
-      transition: all 0.2s;
-    }
-    .command-bar button#send {
-      background: rgba(0, 240, 255, 0.25);
-      border: 1px solid #00f0ff;
-      color: #ffffff;
-      font-weight: 800;
-      font-size: 0.76rem;
-      letter-spacing: 1px;
-      padding: 0 12px;
-    }
-    .command-bar button:active { transform: scale(0.94); }
-    #holo-screen {
-      display: none;
-      position: absolute;
-      bottom: 66px;
-      left: 14px;
-      right: 14px;
-      height: 220px;
-      background: rgba(2, 12, 22, 0.85);
-      backdrop-filter: blur(20px);
-      -webkit-backdrop-filter: blur(20px);
-      border: 1.5px solid rgba(0, 240, 255, 0.6);
-      border-radius: 12px;
-      box-shadow: 0 10px 40px rgba(0, 0, 0, 0.75), 0 0 25px rgba(0, 240, 255, 0.35);
-      z-index: 50;
-      overflow: hidden;
-    }
-    #holo-header {
-      background: rgba(0, 240, 255, 0.15);
-      color: #00f0ff;
-      font-size: 0.72rem;
-      font-weight: bold;
-      letter-spacing: 1.5px;
-      padding: 6px 10px;
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      border-bottom: 1px solid rgba(0, 240, 255, 0.3);
-    }
-    .holo-actions {
-      display: flex;
-      gap: 8px;
-    }
-    .holo-actions button {
-      background: transparent;
-      border: none;
-      font-size: 0.9rem;
-      font-weight: bold;
-      cursor: pointer;
-    }
-    #holo-external { color: #00ffaa; }
-    #holo-close { color: #ff0055; }
-    #holo-frame {
-      width: 100%;
-      height: calc(100% - 28px);
-      border: none;
-    }
-  </style>
+  <!-- Episode 09 PWA Manifest & Mobile Tags -->
+  <link rel="manifest" href="manifest.json">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="theme-color" content="#00ffff">
+
+  <link rel="stylesheet" href="style.css">
 </head>
 <body>
-  <div class="hud-container">
-    <!-- Top Cyber Header -->
-    <header>
-      <div class="hud-top-meta">
-        <span id="live-clock">00:00:00</span>
-        <span class="system-badge">QUANTUM CORE v2.4</span>
-      </div>
-      <h1 class="glitch" data-text="J.A.R.V.I.S">J.A.R.V.I.S</h1>
-      <p class="status-text">NEURAL UPLINK ONLINE</p>
+  <div class="jarvis-container">
+    <header class="top-bar">
+      <div class="status-badge">ONLINE // 24/7</div>
+      <button id="wakeToggleBtn" class="wake-btn" onclick="toggleWakeWord()">
+        <span id="wakeStatusDot" class="dot"></span>
+        <span id="wakeBtnText">Wake Mode: OFF</span>
+      </button>
     </header>
 
-    <!-- Arc Reactor Core -->
-    <div class="reactor-container">
-      <div class="arc-reactor" id="arc-core">
-        <div class="ring outer"></div>
-        <div class="ring middle"></div>
-        <div class="ring inner"></div>
-        <div class="center" id="reactor-center"></div>
+    <main class="core-display">
+      <div id="orbCore" class="orb-container">
+        <div class="orb-glow"></div>
+        <div class="orb-ring"></div>
+        <div class="orb-inner"></div>
       </div>
-      <p class="reactor-status" id="reactor-state-label">ARC REACTOR ACTIVE</p>
-    </div>
+      <div id="responseBox" class="terminal-box">Ready for command, Boss...</div>
+    </main>
 
-    <!-- Live Telemetry Diagnostic Panel -->
-    <div class="diagnostic-panel">
-      <div class="panel-header">
-        <span>SYSTEM DIAGNOSTICS</span>
-        <span id="ping-indicator">LATENCY: 18ms</span>
-      </div>
-      <div class="telemetry-row">
-        <span>CORE TEMP</span>
-        <span class="val-ok" id="temp-val">34.2°C NORMAL</span>
-      </div>
-      <div class="telemetry-row">
-        <span>NETWORK LINK</span>
-        <span class="val-ok" id="net-val">SECURE 5G/WIFI</span>
-      </div>
-      <div class="telemetry-row">
-        <span>BATTERY TELEMETRY</span>
-        <span class="val-ok" id="battery-val">100% [ONLINE]</span>
-      </div>
-    </div>
-
-    <!-- Terminal Feed -->
-    <div class="terminal-chat" id="chat">
-      <div class="msg ai">
-        <span class="prefix">J.A.R.V.I.S:</span> Quantum systems calibrated. Slang Mirroring, Radar Navigation, and Satellite Vision active. Command me, Boss.
-      </div>
-    </div>
-
-    <!-- Holographic Floating Mini Screen Window -->
-    <div id="holo-screen">
-      <div id="holo-header">
-        <span id="holo-title">🛰️ RADAR TELEMETRY</span>
-        <div class="holo-actions">
-          <button id="holo-external" title="Open Fullscreen">↗</button>
-          <button id="holo-close" onclick="closeMiniScreen()">✖</button>
-        </div>
-      </div>
-      <iframe id="holo-frame" src="" allow="autoplay; encrypted-media"></iframe>
-    </div>
-
-    <!-- Hidden Camera Input -->
-    <input type="file" id="camera-input" accept="image/*" capture="environment" style="display: none;" />
-
-    <!-- Unbreakable Single-Row Glass Control Deck -->
-    <div class="command-bar">
-      <input type="text" id="msg" placeholder="Speak or enter command..." autocomplete="off" />
-      <button id="cam-btn" title="Visual Sensor">📸</button>
-      <button id="mic" title="Voice Input">🎤</button>
-      <button id="send">EXEC</button>
-      <button id="clear-btn" title="Clear Memory">🗑️</button>
-    </div>
+    <footer class="bottom-bar">
+      <button class="manual-mic-btn" onclick="triggerManualListening()">🎤 Speak</button>
+    </footer>
   </div>
 
-  <!-- SCRIPT TAG AT BOTTOM -->
   <script src="script.js"></script>
 </body>
 </html>

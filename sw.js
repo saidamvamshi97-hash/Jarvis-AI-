@@ -1,39 +1,8 @@
-// =========================================================================
-// J.A.R.V.I.S. OFFLINE SERVICE WORKER CACHE
-// =========================================================================
-
-const CACHE_NAME = "jarvis-core-v3";
-const ASSETS_TO_CACHE = [
-  "./",
-  "./index.html",
-  "./style.css",
-  "./script.js",
-  "./manifest.json"
-];
-
-self.addEventListener("install", (event) => {
-  event.waitUntil(
-    caches.open(CACHE_NAME).then((cache) => cache.addAll(ASSETS_TO_CACHE))
-  );
-  self.skipWaiting();
-});
-
+// Self-destroying Service Worker to ensure fresh code delivery
+self.addEventListener("install", () => self.skipWaiting());
 self.addEventListener("activate", (event) => {
   event.waitUntil(
-    caches.keys().then((keys) =>
-      Promise.all(
-        keys.map((key) => {
-          if (key !== CACHE_NAME) return caches.delete(key);
-        })
-      )
-    )
+    caches.keys().then((keys) => Promise.all(keys.map((k) => caches.delete(k))))
   );
-  self.clients.claim();
-});
-
-self.addEventListener("fetch", (event) => {
-  if (event.request.url.includes("/api/")) return;
-  event.respondWith(
-    caches.match(event.request).then((res) => res || fetch(event.request))
-  );
+  self.registration.unregister();
 });

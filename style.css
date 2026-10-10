@@ -5,9 +5,9 @@
 }
 
 body {
-  background: #030712;
+  background: #020617;
   color: #00ffff;
-  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Orbitron", monospace;
   height: 100vh;
   overflow: hidden;
   user-select: none;
@@ -25,21 +25,34 @@ body {
   z-index: 1;
 }
 
+/* Background HUD Grid Scanline */
+.jarvis-container::before {
+  content: " ";
+  position: absolute;
+  top: 0; left: 0; width: 100%; height: 100%;
+  background: linear-gradient(rgba(18, 16, 16, 0) 50%, rgba(0, 255, 255, 0.02) 50%), linear-gradient(90deg, rgba(255, 0, 0, 0.02), rgba(0, 255, 255, 0.01), rgba(0, 0, 255, 0.02));
+  background-size: 100% 3px, 6px 100%;
+  pointer-events: none;
+  z-index: 0;
+}
+
 .top-bar {
   width: 100%;
   display: flex;
   justify-content: space-between;
   align-items: center;
+  z-index: 2;
 }
 
 .status-badge {
   font-size: 11px;
   letter-spacing: 2px;
-  font-weight: 600;
-  padding: 4px 10px;
+  font-weight: 700;
+  padding: 5px 12px;
   border: 1px solid rgba(0, 255, 255, 0.4);
   border-radius: 6px;
   background: rgba(0, 255, 255, 0.05);
+  box-shadow: inset 0 0 10px rgba(0, 255, 255, 0.1);
 }
 
 .wake-btn {
@@ -61,7 +74,7 @@ body {
   background: rgba(0, 255, 119, 0.2);
   border-color: #00ff77;
   color: #00ff77;
-  box-shadow: 0 0 14px rgba(0, 255, 119, 0.4);
+  box-shadow: 0 0 16px rgba(0, 255, 119, 0.5);
 }
 
 .wake-btn .dot {
@@ -69,27 +82,47 @@ body {
   height: 8px;
   border-radius: 50%;
   background-color: #555;
+  transition: all 0.3s ease;
 }
 
 .wake-btn.active .dot {
   background-color: #00ff77;
-  box-shadow: 0 0 8px #00ff77;
+  box-shadow: 0 0 10px #00ff77;
 }
 
+/* =========================================================================
+   FUTURISTIC ARC REACTOR & RADAR SCANNER
+   ========================================================================= */
 .core-display {
   display: flex;
   flex-direction: column;
   align-items: center;
   gap: 16px;
+  z-index: 2;
 }
 
 .orb-container {
-  width: 180px;
-  height: 180px;
+  width: 220px;
+  height: 220px;
   position: relative;
   display: flex;
   align-items: center;
   justify-content: center;
+}
+
+.radar-sweep {
+  position: absolute;
+  width: 210px;
+  height: 210px;
+  border-radius: 50%;
+  border: 1px solid rgba(0, 255, 255, 0.15);
+  background: conic-gradient(from 0deg, rgba(0, 255, 255, 0.18) 0deg, transparent 60deg, transparent 360deg);
+  animation: radarScan 3s linear infinite;
+  display: none;
+}
+
+.orb-container.wake-active .radar-sweep {
+  display: block;
 }
 
 .orb-glow {
@@ -99,17 +132,26 @@ body {
   border-radius: 50%;
   background: radial-gradient(circle, rgba(0,255,255,0.4) 0%, rgba(0,255,255,0) 70%);
   animation: pulse 2.5s infinite ease-in-out;
-  transition: all 0.4s ease;
+  transition: all 0.3s ease;
 }
 
 .orb-ring {
   position: absolute;
-  width: 140px;
-  height: 140px;
+  width: 150px;
+  height: 150px;
   border: 2px dashed #00ffff;
   border-radius: 50%;
-  animation: rotate 12s linear infinite;
-  transition: border-color 0.4s ease;
+  animation: rotateClockwise 14s linear infinite;
+  transition: all 0.4s ease;
+}
+
+.orb-outer-reticle {
+  position: absolute;
+  width: 180px;
+  height: 180px;
+  border: 1px dotted rgba(0, 255, 255, 0.5);
+  border-radius: 50%;
+  animation: rotateCounter 20s linear infinite;
 }
 
 .orb-inner {
@@ -117,8 +159,34 @@ body {
   height: 80px;
   border-radius: 50%;
   background: #00ffff;
-  box-shadow: 0 0 28px #00ffff;
-  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  box-shadow: 0 0 32px #00ffff;
+  transition: transform 0.08s ease, background-color 0.3s ease, box-shadow 0.3s ease;
+}
+
+/* Audio Frequency & HUD telemetry bar */
+.hud-telemetry {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  font-size: 11px;
+  color: rgba(0, 255, 255, 0.75);
+  letter-spacing: 1.5px;
+  margin-top: -6px;
+}
+
+.hud-signal-bar {
+  width: 80px;
+  height: 4px;
+  background: rgba(0, 255, 255, 0.2);
+  border-radius: 2px;
+  overflow: hidden;
+}
+
+.hud-signal-fill {
+  width: 0%;
+  height: 100%;
+  background: #00ff77;
+  transition: width 0.08s ease;
 }
 
 .terminal-box {
@@ -127,7 +195,7 @@ body {
   font-size: 15px;
   color: #e2f8ff;
   line-height: 1.5;
-  min-height: 40px;
+  min-height: 44px;
 }
 
 .debug-subtext {
@@ -154,9 +222,7 @@ body {
   background: rgba(0, 255, 255, 0.25);
 }
 
-/* =========================================================================
-   UNIVERSAL FLOATING APP HUD
-   ========================================================================= */
+/* Universal Modal HUD */
 .floating-hud-modal {
   display: none;
   position: fixed;
@@ -164,14 +230,14 @@ body {
   left: 4%;
   width: 92%;
   height: 250px;
-  background: rgba(3, 7, 18, 0.95);
+  background: rgba(2, 6, 23, 0.95);
   border: 1px solid #00ffff;
   border-radius: 14px;
   box-shadow: 0 0 25px rgba(0, 255, 255, 0.35);
   z-index: 9999;
   flex-direction: column;
   overflow: hidden;
-  backdrop-filter: blur(12px);
+  backdrop-filter: blur(14px);
 }
 
 .hud-header {
@@ -207,7 +273,6 @@ body {
   color: #00ffff;
   font-size: 18px;
   cursor: pointer;
-  padding: 0 4px;
 }
 
 .hud-body {
@@ -227,6 +292,14 @@ body {
   50% { transform: scale(1.08); opacity: 0.95; }
 }
 
-@keyframes rotate {
+@keyframes rotateClockwise {
+  100% { transform: rotate(360deg); }
+}
+
+@keyframes rotateCounter {
+  100% { transform: rotate(-360deg); }
+}
+
+@keyframes radarScan {
   100% { transform: rotate(360deg); }
 }

@@ -9,7 +9,7 @@
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <meta name="theme-color" content="#00ffff">
 
-  <link rel="stylesheet" href="style.css?v=2026_final_hud">
+  <link rel="stylesheet" href="style.css?v=2026_stark_hud">
 </head>
 <body>
   <div class="jarvis-container">
@@ -23,10 +23,22 @@
 
     <main class="core-display">
       <div id="orbCore" class="orb-container">
+        <div class="radar-sweep"></div>
         <div class="orb-glow"></div>
+        <div class="orb-outer-reticle"></div>
         <div class="orb-ring"></div>
         <div class="orb-inner"></div>
       </div>
+
+      <!-- Real-time Audio Spectrum & Sensitivity HUD -->
+      <div class="hud-telemetry">
+        <span id="hzLevelText">000 Hz</span>
+        <div class="hud-signal-bar">
+          <div id="hudSignalFill" class="hud-signal-fill"></div>
+        </div>
+        <span id="dbLevelText">-INF dB</span>
+      </div>
+
       <div id="responseBox" class="terminal-box">Ready for command, Boss...</div>
       <div id="debugBox" class="debug-subtext">Waiting for audio input...</div>
     </main>
@@ -56,6 +68,6 @@
     </div>
   </div>
 
-  <script src="script.js?v=2026_final_hud"></script>
+  <script src="script.js?v=2026_stark_hud"></script>
 </body>
 </html>

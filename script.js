@@ -1,5 +1,5 @@
 // =========================================================================
-// J.A.R.V.I.S. MULTILINGUAL RUNTIME + MULTI-TASK & FAILOVER ENGINE
+// J.A.R.V.I.S. MULTILINGUAL RUNTIME + HARDWARE NOISE FILTER & FAILOVER ENGINE
 // =========================================================================
 
 const WORKER_ENDPOINT = "https://jarvis-automation.saidamvamshi97.workers.dev/api/ask";
@@ -9,6 +9,7 @@ let wakeRecognition = null;
 let commandRecognition = null;
 let isWakeActive = false;
 let isCommandActive = false;
+let mediaStream = null;
 
 // Audio synthesis warmup
 window.addEventListener("touchstart", () => {
@@ -46,6 +47,25 @@ function updateUI(mainText, debugText) {
   const debug = document.getElementById("debugBox");
   if (box) box.innerText = mainText;
   if (debug && debugText) debug.innerText = debugText;
+}
+
+// -------------------------------------------------------------------------
+// HARDWARE DSP NOISE SUPPRESSION
+// -------------------------------------------------------------------------
+async function enableHardwareNoiseFiltering() {
+  try {
+    if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
+      mediaStream = await navigator.mediaDevices.getUserMedia({
+        audio: {
+          echoCancellation: true,
+          noiseSuppression: true,
+          autoGainControl: true
+        }
+      });
+    }
+  } catch (err) {
+    console.warn("Hardware DSP filter bypass:", err);
+  }
 }
 
 // -------------------------------------------------------------------------
@@ -95,7 +115,7 @@ function splitMultiCommands(prompt) {
 }
 
 function executeSingleAction(p) {
-  // 1. Time / Watch (Telugu, Hindi, Tamil, English)
+  // 1. Live Time
   const timeTriggers = ["time", "watch", "clock", "samayam", "time entha", "samay", "neram", "ghadi"];
   if (timeTriggers.some(w => p.includes(w))) {
     const timeStr = new Date().toLocaleTimeString("en-IN", { hour: "numeric", minute: "2-digit", hour12: true });
@@ -152,7 +172,7 @@ function executeSingleAction(p) {
     }
   }
 
-  // 6. Music & Video Dispatcher (Native YouTube Intent or Spotify HUD)
+  // 6. Music & Video Dispatcher
   const musicTriggers = [
     "play", "paly", "ply", "song", "songs", "paata", "paatalu", "music", "youtube", "spotify",
     "chiranjeevi", "prabhas", "pawan", "kalyan", "rebel", "salaar", "dsp", "anirudh"
@@ -234,7 +254,7 @@ async function interceptLocalAction(rawPrompt) {
 }
 
 // -------------------------------------------------------------------------
-// SPEECH RECOGNITION & BACKEND ROUTER
+// SPEECH RECOGNITION (MANUAL BUTTON)
 // -------------------------------------------------------------------------
 function startCommandListening() {
   if (!SpeechRecognition) {
@@ -248,7 +268,7 @@ function startCommandListening() {
   }
 
   setJarvisVisualState("LISTENING");
-  updateUI("Listening...", "Mic active. Speak in Telugu, Hindi, Tamil, or English...");
+  updateUI("Listening...", "Mic active. Speak clearly...");
 
   commandRecognition = new SpeechRecognition();
   commandRecognition.continuous = false;
@@ -259,15 +279,14 @@ function startCommandListening() {
     const prompt = event.results[0][0].transcript;
     updateUI(`"${prompt}"`, `Heard: "${prompt}"`);
 
-    // 1. Intercept fast local actions & multi-tasks
     const wasHandled = await interceptLocalAction(prompt);
     if (wasHandled) {
       setJarvisVisualState("IDLE");
       isCommandActive = false;
+      resumeWakeEngine();
       return;
     }
 
-    // 2. Query Cloudflare Backend
     setJarvisVisualState("THINKING");
 
     try {
@@ -334,7 +353,7 @@ function speakVoiceQuick(text) {
 }
 
 // -------------------------------------------------------------------------
-// CONTINUOUS WAKE WORD ENGINE ("Hey Jarvis")
+// STRICT NOISE-FILTERED WAKE WORD ENGINE ("Hey Jarvis")
 // -------------------------------------------------------------------------
 function initWakeWordEngine() {
   if (!SpeechRecognition) return;
@@ -345,12 +364,38 @@ function initWakeWordEngine() {
   wakeRecognition.lang = "en-IN";
 
   wakeRecognition.onresult = (event) => {
-    const text = event.results[event.resultIndex][0].transcript.trim().toLowerCase();
-    updateUI("Ready for command, Boss.", `Wake Audio: "${text}"`);
+    const result = event.results[event.resultIndex];
+    const text = result[0].transcript.trim().toLowerCase();
+    const confidence = result[0].confidence;
 
-    if (text.includes("hey jarvis") || text.includes("jarvis") || text.includes("hai jarvis")) {
+    // 1. Ignore background hum / low-confidence audio noise
+    if (confidence && confidence < 0.65) {
+      return;
+    }
+
+    // 2. Strict Wake Word boundary check
+    const wakeRegex = /\b(hey jarvis|jarvis|hai jarvis|ok jarvis|hi jarvis)\b/i;
+
+    if (wakeRegex.test(text)) {
+      updateUI("Yes Boss?", "Wake Word Authenticated");
       speakVoiceQuick("Yes Boss?");
-      startCommandListening();
+      
+      const directCommand = text.replace(wakeRegex, "").trim();
+      if (directCommand.length > 2) {
+        handleDirectCommand(directCommand);
+      } else {
+        startCommandListening();
+      }
+    } else {
+      // Ambient noise filtered without changing state
+      const debug = document.getElementById("debugBox");
+      if (debug) debug.innerText = `Ignored Noise: "${text}"`;
+    }
+  };
+
+  wakeRecognition.onerror = (e) => {
+    if (e.error !== "no-speech") {
+      console.warn("Wake recognizer status:", e.error);
     }
   };
 
@@ -363,23 +408,57 @@ function initWakeWordEngine() {
   };
 }
 
-function toggleWakeWord() {
+async function handleDirectCommand(prompt) {
+  updateUI(`"${prompt}"`, `Direct Prompt: "${prompt}"`);
+  
+  const wasHandled = await interceptLocalAction(prompt);
+  if (wasHandled) {
+    setJarvisVisualState("IDLE");
+    resumeWakeEngine();
+    return;
+  }
+
+  setJarvisVisualState("THINKING");
+  try {
+    const res = await fetch(WORKER_ENDPOINT, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ prompt })
+    });
+    const data = await res.json();
+    const reply = data.reply || "Done, Boss.";
+    updateUI(reply, "Cloud AI Answered");
+    speakVoiceQuick(reply);
+  } catch (err) {
+    updateUI("Systems link timeout, Boss.", `Error: ${err.message}`);
+  }
+
+  setJarvisVisualState("IDLE");
+  resumeWakeEngine();
+}
+
+async function toggleWakeWord() {
   if (!wakeRecognition) initWakeWordEngine();
 
   const btn = document.getElementById("wakeToggleBtn");
   const txt = document.getElementById("wakeBtnText");
 
   if (!isWakeActive) {
+    await enableHardwareNoiseFiltering();
     try {
       wakeRecognition.start();
       isWakeActive = true;
       if (btn) btn.classList.add("active");
       if (txt) txt.innerText = "Wake Mode: ON";
-      updateUI("Wake Mode Active", "Listening for 'Hey Jarvis'...");
+      updateUI("Wake Mode Active", "Listening strictly for 'Hey Jarvis'...");
     } catch (err) {}
   } else {
     isWakeActive = false;
     try { wakeRecognition.stop(); } catch (e) {}
+    if (mediaStream) {
+      mediaStream.getTracks().forEach(track => track.stop());
+      mediaStream = null;
+    }
     if (btn) btn.classList.remove("active");
     if (txt) txt.innerText = "Wake Mode: OFF";
     updateUI("Ready for command, Boss.", "Wake Mode Off.");

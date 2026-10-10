@@ -1,5 +1,5 @@
 // =========================================================================
-// J.A.R.V.I.S. ZERO-LATENCY INTENT & BULLETPROOF SPEECH ENGINE
+// J.A.R.V.I.S. ULTRA-FAST INTENT & PHONETIC ACTION ENGINE
 // =========================================================================
 
 const WORKER_ENDPOINT = "https://jarvis-automation.saidamvamshi97.workers.dev/api/ask";
@@ -11,7 +11,7 @@ let commandRecognition = null;
 let isWakeActive = false;
 let isCommandActive = false;
 
-// Pre-warm browser audio synthesiser
+// Pre-warm browser audio synthesis
 window.addEventListener("touchstart", () => {
   if ("speechSynthesis" in window) {
     window.speechSynthesis.speak(new SpeechSynthesisUtterance(""));
@@ -42,30 +42,54 @@ function setJarvisVisualState(state) {
   }
 }
 
-// 1. High-Priority Local Action Parser (<20ms execution)
+// Zero-Latency Local Action Interceptor (< 15ms Execution)
 function interceptLocalAction(rawPrompt) {
   const p = rawPrompt.toLowerCase().trim();
 
-  // Music & YouTube Interceptor (catches "play", "paly", "ply", "song", "songs", "prabhas", "bahubali", "youtube")
+  // 1. Instant Watch / Clock / Time Interceptor
   if (
-    p.includes("play") || 
-    p.includes("paly") || 
-    p.includes("ply") || 
-    p.includes("song") || 
-    p.includes("songs") || 
-    p.includes("youtube") || 
-    p.includes("music") || 
-    p.includes("prabhas") ||
-    p.includes("bahubali")
+    p.includes("watch") || 
+    p.includes("time") || 
+    p.includes("clock") || 
+    p.includes("samayam") ||
+    p.includes("time entha")
   ) {
+    const now = new Date();
+    const timeStr = now.toLocaleTimeString("en-IN", {
+      hour: "numeric",
+      minute: "2-digit",
+      hour12: true
+    });
+    const message = `The time is ${timeStr}, Boss.`;
+    const box = document.getElementById("responseBox");
+    if (box) box.innerText = message;
+    speakVoiceQuick(message);
+    return true;
+  }
+
+  // 2. Greedy Media & YouTube Interceptor (Handles Chiranjeevi, songs, play, etc.)
+  const musicTriggers = [
+    "play", "paly", "ply", "song", "songs", "music", "youtube", "video",
+    "chiranjeevi", "prabhas", "bahubali", "pawan", "kalyan", "ntr", "mahesh", "allu arjun"
+  ];
+
+  const hasMusicIntent = musicTriggers.some(word => p.includes(word));
+
+  if (hasMusicIntent) {
+    // Strip common filler noise and question words cleanly
     let query = p
-      .replace(/^(hey jarvis|jarvis|please|can you)/gi, "")
-      .replace(/\b(play|paly|ply|ple|start|listen to)\b/gi, "")
-      .replace(/on youtube/gi, "")
-      .replace(/in youtube/gi, "")
+      .replace(/when\s+(i\s+have\s+to|do\s+i|should\s+i)/gi, "")
+      .replace(/how\s+(to|do\s+i)/gi, "")
+      .replace(/^(hey jarvis|jarvis|please|can you|could you|want to)/gi, "")
+      .replace(/\b(play|paly|ply|start|listen to|watch|open)\b/gi, "")
+      .replace(/\b(on youtube|in youtube|youtube)\b/gi, "")
       .trim();
 
-    if (!query) query = "Prabhas songs";
+    if (!query || query === "songs" || query === "song") {
+      if (p.includes("chiranjeevi")) query = "Chiranjeevi songs";
+      else if (p.includes("prabhas")) query = "Prabhas songs";
+      else query = "Telugu hit songs";
+    }
 
     const box = document.getElementById("responseBox");
     if (box) box.innerText = `Playing ${query} on YouTube...`;
@@ -73,19 +97,18 @@ function interceptLocalAction(rawPrompt) {
 
     setTimeout(() => {
       window.location.href = `https://www.youtube.com/results?search_query=${encodeURIComponent(query)}`;
-    }, 800);
+    }, 600);
     return true;
   }
 
-  // Navigation & Floating Maps Interceptor
+  // 3. Navigation & Floating Maps Interceptor
   if (
     p.includes("navigate") || 
     p.includes("nivgate") || 
     p.includes("navgate") || 
     p.includes("direction") || 
-    p.includes("route to") || 
-    p.includes("map to") ||
-    (p.includes("map") && p.includes("to"))
+    p.includes("route") || 
+    p.includes("map")
   ) {
     let dest = p
       .replace(/.*(?:navigate to|nivgate to|navgate to|route to|map to|directions to|go to)/gi, "")
@@ -101,7 +124,7 @@ function interceptLocalAction(rawPrompt) {
     return true;
   }
 
-  // Google Search Interceptor
+  // 4. Google Search Interceptor
   if (p.includes("google") || p.includes("search")) {
     const q = p
       .replace(/.*(?:search google for|google search|search for|google)/gi, "")
@@ -113,14 +136,14 @@ function interceptLocalAction(rawPrompt) {
 
     setTimeout(() => {
       window.location.href = `https://www.google.com/search?q=${encodeURIComponent(q)}`;
-    }, 800);
+    }, 600);
     return true;
   }
 
   return false;
 }
 
-// In-App Floating Map HUD Controls
+// Floating HUD Map Controls
 function openFloatingMap(destination) {
   const modal = document.getElementById("floatingMapModal");
   const frame = document.getElementById("mapFrame");
@@ -143,7 +166,7 @@ function closeFloatingMap() {
   setJarvisVisualState("IDLE");
 }
 
-// 2. Continuous Hotword Detector ("Hey Jarvis")
+// Hotword Wake Engine ("Hey Jarvis")
 function initWakeWordEngine() {
   if (!SpeechRecognition) return;
 
@@ -154,8 +177,6 @@ function initWakeWordEngine() {
 
   wakeRecognition.onresult = (event) => {
     const text = event.results[event.resultIndex][0].transcript.trim().toLowerCase();
-    console.log("[Wake Mic Heard]:", text);
-
     if (text.includes("hey jarvis") || text.includes("jarvis") || text.includes("hai jarvis")) {
       speakVoiceQuick("Yes Boss?");
       startCommandListening();
@@ -163,7 +184,6 @@ function initWakeWordEngine() {
   };
 
   wakeRecognition.onerror = (e) => {
-    console.warn("Wake mic status:", e.error);
     if (e.error === "not-allowed") {
       const box = document.getElementById("responseBox");
       if (box) box.innerText = "Mic blocked. Allow microphone permissions in browser settings.";
@@ -179,7 +199,7 @@ function initWakeWordEngine() {
   };
 }
 
-// 3. User Voice Command Listener
+// User Command Listener
 function startCommandListening() {
   if (!SpeechRecognition) return;
 
@@ -201,7 +221,7 @@ function startCommandListening() {
     const prompt = event.results[0][0].transcript;
     if (box) box.innerText = `"${prompt}"`;
 
-    // Local action bypass
+    // Local action bypass (<15ms)
     if (interceptLocalAction(prompt)) {
       setJarvisVisualState("IDLE");
       isCommandActive = false;
@@ -231,7 +251,6 @@ function startCommandListening() {
   };
 
   commandRecognition.onerror = (e) => {
-    console.warn("Command error:", e.error);
     setJarvisVisualState("IDLE");
     isCommandActive = false;
     resumeWakeEngine();
@@ -253,12 +272,13 @@ function resumeWakeEngine() {
   }
 }
 
+// Fast Speech Synthesizer (1.15x speed to eliminate audio lag)
 function speakVoiceQuick(text) {
   if (!("speechSynthesis" in window)) return;
   window.speechSynthesis.cancel();
   const utterance = new SpeechSynthesisUtterance(text);
   utterance.lang = "en-IN";
-  utterance.rate = 1.1;
+  utterance.rate = 1.15;
   utterance.pitch = 1.0;
   window.speechSynthesis.speak(utterance);
 }
@@ -276,10 +296,8 @@ function toggleWakeWord() {
       isWakeActive = true;
       if (btn) btn.classList.add("active");
       if (txt) txt.innerText = "Wake Mode: ON";
-      if (box) box.innerText = "Wake Mode active. Say 'Hey Jarvis'...";
-    } catch (err) {
-      console.error(err);
-    }
+      if (box) box.innerText = "Say 'Hey Jarvis'...";
+    } catch (err) {}
   } else {
     isWakeActive = false;
     try { wakeRecognition.stop(); } catch (e) {}
@@ -294,7 +312,7 @@ function triggerManualListening() {
   startCommandListening();
 }
 
-// Service Worker Cache Registration
+// Service Worker Cache
 if ("serviceWorker" in navigator) {
   window.addEventListener("load", () => {
     navigator.serviceWorker.register("./sw.js").catch(() => {});

@@ -1,5 +1,5 @@
 // =========================================================================
-// J.A.RV.I.S. MULTILINGUAL (TELUGU / HINDI / TAMIL / ENGLISH) CORE ENGINE
+// J.A.R.V.I.S. MULTILINGUAL RUNTIME + UNIVERSAL HUD & APP DISPATCHER (V8)
 // =========================================================================
 
 const WORKER_ENDPOINT = "https://jarvis-automation.saidamvamshi97.workers.dev/api/ask";
@@ -48,18 +48,53 @@ function updateUI(mainText, debugText) {
   if (debug && debugText) debug.innerText = debugText;
 }
 
-// 1. Multilingual Zero-Latency Local Action Interceptor
+// -------------------------------------------------------------------------
+// UNIVERSAL FLOATING HUD ENGINE
+// -------------------------------------------------------------------------
+function openUniversalApp(appName, embedUrl, deepLinkUrl) {
+  const modal = document.getElementById("universalAppModal");
+  const frame = document.getElementById("appHudFrame");
+  const title = document.getElementById("appHudTitle");
+  const pip = document.getElementById("appPipLink");
+
+  if (title) title.innerText = `${appName.toUpperCase()} // ACTIVE`;
+  
+  if (pip && deepLinkUrl) {
+    pip.href = deepLinkUrl;
+    pip.style.display = "inline";
+    pip.innerText = `[OPEN APP]`;
+  } else if (pip) {
+    pip.style.display = "none";
+  }
+
+  if (frame) {
+    frame.src = embedUrl;
+  }
+  if (modal) {
+    modal.style.display = "flex";
+  }
+}
+
+function closeUniversalApp() {
+  const modal = document.getElementById("universalAppModal");
+  const frame = document.getElementById("appHudFrame");
+  if (modal) modal.style.display = "none";
+  if (frame) frame.src = "";
+  setJarvisVisualState("IDLE");
+}
+
+// -------------------------------------------------------------------------
+// MULTILINGUAL FAST LOCAL INTENT INTERCEPTOR (<10ms)
+// -------------------------------------------------------------------------
 function interceptLocalAction(rawPrompt) {
   const p = rawPrompt.toLowerCase().trim();
 
-  // A. Time / Watch / Clock in English, Telugu, Hindi, Tamil
-  // "samayam", "time entha", "kiti vaje", "neram", "kalam", "watch", "ghadi"
-  const timeKeywords = [
+  // 1. TIME / WATCH (Telugu, Hindi, Tamil, English)
+  const timeTriggers = [
     "time", "watch", "clock", "samayam", "time entha", "samayam entha", 
     "kya time", "samay", "neram", "kiti vaje", "ghadi", "mani enna"
   ];
-
-  if (timeKeywords.some(w => p.includes(w))) {
+  if (timeTriggers.some(w => p.includes(w))) {
     const timeStr = new Date().toLocaleTimeString("en-IN", { hour: "numeric", minute: "2-digit", hour12: true });
     const reply = `The time is ${timeStr}, Boss.`;
     updateUI(reply, "Action: Live Time Triggered");
@@ -67,40 +102,108 @@ function interceptLocalAction(rawPrompt) {
     return true;
   }
 
-  // B. Multilingual Music & Video Interceptor
-  // Supports: play, paly, ply, paata, paatalu, gaana, geet, paatu, paadal, video, music
+  // 2. CRICKET & IPL SCORES (Floating HUD)
+  if (p.includes("cricket") || p.includes("score") || p.includes("ipl") || p.includes("match")) {
+    const reply = "Streaming live cricket scorecard in HUD, Boss.";
+    updateUI(reply, "Dispatched: Cricket Scores");
+    speakVoiceQuick(reply);
+    openUniversalApp("Live Cricket", "https://m.cricbuzz.com/cricket-match/live-scores", "https://www.cricbuzz.com");
+    return true;
+  }
+
+  // 3. WEATHER RADAR (Floating HUD)
+  if (p.includes("weather") || p.includes("climate") || p.includes("rain") || p.includes("varsham") || p.includes("mausam")) {
+    const reply = "Loading atmospheric weather radar, Boss.";
+    updateUI(reply, "Dispatched: Weather Radar");
+    speakVoiceQuick(reply);
+    openUniversalApp(
+      "Weather Radar",
+      "https://embed.windy.com/embed2.html?lat=16.36&lon=78.06&detailLat=16.36&detailLon=78.06&width=400&height=250&zoom=7&level=surface&overlay=radar&product=radar&menu=&message=&marker=&calendar=now&pressure=&type=map&location=coordinates&detail=&metricWind=km%2Fh&metricTemp=%C2%B0C&radarRange=-1",
+      "https://www.windy.com"
+    );
+    return true;
+  }
+
+  // 4. SCIENTIFIC CALCULATOR (Floating HUD)
+  if (p.includes("calculator") || p.includes("calculate") || p.includes("hisab") || p.includes("lekkalu")) {
+    const reply = "Opening calculator terminal, Boss.";
+    updateUI(reply, "Dispatched: Calculator");
+    speakVoiceQuick(reply);
+    openUniversalApp("Calculator", "https://www.desmos.com/scientific", "https://www.desmos.com/scientific");
+    return true;
+  }
+
+  // 5. WIKIPEDIA / INTEL SEARCH (Floating HUD)
+  if (p.startsWith("wiki") || p.startsWith("who is") || p.startsWith("what is")) {
+    const topic = p.replace(/^(wiki|who is|what is|tell me about)/gi, "").trim();
+    if (topic.length > 2) {
+      const reply = `Retrieving intelligence on ${topic}, Boss.`;
+      updateUI(reply, `Dispatched: Wikipedia -> ${topic}`);
+      speakVoiceQuick(reply);
+      openUniversalApp(
+        `WIKI // ${topic}`,
+        `https://en.m.wikipedia.org/wiki/${encodeURIComponent(topic)}`,
+        `https://en.wikipedia.org/wiki/${encodeURIComponent(topic)}`
+      );
+      return true;
+    }
+  }
+
+  // 6. MULTILINGUAL MUSIC ROUTING (YouTube App Intent or Spotify HUD)
   const musicTriggers = [
     "play", "paly", "ply", "ple", "song", "songs", "paata", "paatalu", "pata", "patalu",
     "gana", "gaana", "geet", "paatu", "padal", "paadal", "music", "youtube", "video",
     "chiranjeevi", "prabhas", "bahubali", "pawan", "kalyan", "rebel", "salaar", "og", "devara",
-    "mahesh", "ntr", "allu arjun", "dsp", "thaman", "anirudh", "rajini", "kamal", "vijay"
+    "mahesh", "ntr", "allu arjun", "dsp", "thaman", "anirudh", "rajini", "kamal", "vijay", "spotify"
   ];
 
   if (musicTriggers.some(w => p.includes(w))) {
-    // Clean regional verbs, command prefixes, and question wrappers
     let cleanQuery = p
       .replace(/when\s+(i\s+have\s+to|do\s+i|should\s+i)/gi, "")
       .replace(/how\s+(to|do\s+i)/gi, "")
       .replace(/^(hey jarvis|jarvis|please|bhayya|mama|bro|can you)/gi, "")
       .replace(/\b(play|paly|ply|start|listen to|watch|open|choodu|vinu|pettu|lagao|chalao|podu)\b/gi, "")
-      .replace(/\b(on youtube|in youtube|youtube|lo|la)\b/gi, "")
+      .replace(/\b(on youtube|in youtube|youtube|on spotify|spotify|lo|la)\b/gi, "")
       .trim();
 
-    // Default fallbacks if user only said "play songs" or regional equivalents
     if (!cleanQuery || ["song", "songs", "paata", "paatalu", "gaana", "paatu"].includes(cleanQuery)) {
       if (p.includes("chiranjeevi")) cleanQuery = "Chiranjeevi hit songs";
       else if (p.includes("prabhas")) cleanQuery = "Prabhas hit songs";
       else cleanQuery = "Telugu latest hit songs";
     }
 
-    const reply = `Streaming ${cleanQuery} in Floating HUD, Boss.`;
-    updateUI(reply, `Dispatched HUD: "${cleanQuery}"`);
+    // A. In-HUD Spotify Stream
+    if (p.includes("spotify")) {
+      const reply = `Streaming ${cleanQuery} on Spotify HUD, Boss.`;
+      updateUI(reply, `Dispatched: Spotify -> "${cleanQuery}"`);
+      speakVoiceQuick(reply);
+      openUniversalApp(
+        `Spotify // ${cleanQuery}`,
+        `https://open.spotify.com/embed/search/${encodeURIComponent(cleanQuery)}`,
+        `spotify:search:${encodeURIComponent(cleanQuery)}`
+      );
+      return true;
+    }
+
+    // B. Native Android YouTube Intent (Supports Background & PiP Playback)
+    const reply = `Playing ${cleanQuery} on YouTube, Boss.`;
+    updateUI(reply, `Launching YouTube: "${cleanQuery}"`);
     speakVoiceQuick(reply);
-    openFloatingMusic(cleanQuery);
+
+    setTimeout(() => {
+      const youtubeIntent = `intent://www.youtube.com/results?search_query=${encodeURIComponent(cleanQuery)}#Intent;scheme=https;package=com.google.android.youtube;end`;
+      const fallbackUrl = `https://www.youtube.com/results?search_query=${encodeURIComponent(cleanQuery)}`;
+      
+      const opened = window.open(youtubeIntent, "_blank");
+      if (!opened) {
+        window.location.href = fallbackUrl;
+      }
+    }, 600);
+
     return true;
   }
 
-  // C. Multilingual Navigation & Maps (Route, Margam, Raasta, Vazhi)
+  // 7. NAVIGATION & MAPS (Floating HUD)
   const navTriggers = ["navigate", "nivgate", "navgate", "route", "direction", "map", "raasta", "margam", "vazhi", "vellu"];
   if (navTriggers.some(w => p.includes(w))) {
     let dest = p
@@ -113,59 +216,22 @@ function interceptLocalAction(rawPrompt) {
     const reply = `Plotting route to ${dest}, Boss.`;
     updateUI(reply, `Dispatched Navigation: "${dest}"`);
     speakVoiceQuick(reply);
-    openFloatingMap(dest);
+
+    const mapEmbed = `https://maps.google.com/maps?q=${encodeURIComponent(dest)}&t=&z=13&ie=UTF8&iwloc=&output=embed`;
+    const mapApp = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(dest)}`;
+    openUniversalApp(`Route: ${dest}`, mapEmbed, mapApp);
     return true;
   }
 
   return false;
 }
 
-// In-App Floating Music HUD
-function openFloatingMusic(query) {
-  const modal = document.getElementById("floatingMusicModal");
-  const frame = document.getElementById("musicFrame");
-  const title = document.getElementById("musicTitle");
-
-  if (title) title.innerText = `AUDIO STREAM // ${query.toUpperCase()}`;
-  if (frame) {
-    frame.src = `https://www.youtube.com/embed?listType=search&list=${encodeURIComponent(query)}&autoplay=1`;
-  }
-  if (modal) modal.style.display = "flex";
-}
-
-function closeFloatingMusic() {
-  const modal = document.getElementById("floatingMusicModal");
-  const frame = document.getElementById("musicFrame");
-  if (modal) modal.style.display = "none";
-  if (frame) frame.src = "";
-  setJarvisVisualState("IDLE");
-}
-
-// In-App Floating Navigation HUD
-function openFloatingMap(destination) {
-  const modal = document.getElementById("floatingMapModal");
-  const frame = document.getElementById("mapFrame");
-  const title = document.getElementById("mapTitle");
-
-  if (title) title.innerText = `NAVIGATION HUD // ${destination.toUpperCase()}`;
-  if (frame) {
-    frame.src = `https://maps.google.com/maps?q=${encodeURIComponent(destination)}&t=&z=13&ie=UTF8&iwloc=&output=embed`;
-  }
-  if (modal) modal.style.display = "flex";
-}
-
-function closeFloatingMap() {
-  const modal = document.getElementById("floatingMapModal");
-  const frame = document.getElementById("mapFrame");
-  if (modal) modal.style.display = "none";
-  if (frame) frame.src = "";
-  setJarvisVisualState("IDLE");
-}
-
-// 2. Active Command Listener with Multilingual Accent Support
+// -------------------------------------------------------------------------
+// SPEECH RECOGNITION & GEMINI WORKER ROUTER
+// -------------------------------------------------------------------------
 function startCommandListening() {
   if (!SpeechRecognition) {
-    alert("SpeechRecognition unsupported. Please use Chrome.");
+    alert("SpeechRecognition unsupported. Please open in Google Chrome.");
     return;
   }
 
@@ -180,22 +246,20 @@ function startCommandListening() {
   commandRecognition = new SpeechRecognition();
   commandRecognition.continuous = false;
   commandRecognition.interimResults = false;
-  
-  // en-IN allows English mixed with Indian transliterations (Tanglish, Hinglish)
-  commandRecognition.lang = "en-IN";
+  commandRecognition.lang = "en-IN"; // Accurately captures regional names & transliterations
 
   commandRecognition.onresult = async (event) => {
     const prompt = event.results[0][0].transcript;
     updateUI(`"${prompt}"`, `Heard: "${prompt}"`);
 
-    // 1. Check local zero-latency actions
+    // 1. Check local fast-path actions
     if (interceptLocalAction(prompt)) {
       setJarvisVisualState("IDLE");
       isCommandActive = false;
       return;
     }
 
-    // 2. Send to Cloudflare Worker for AI response
+    // 2. Query Cloudflare Gemini Worker
     setJarvisVisualState("THINKING");
 
     try {
@@ -240,21 +304,20 @@ function resumeWakeEngine() {
   }
 }
 
-// Speech Synthesizer: Detects Telugu/Hindi scripts vs English automatically
+// Multilingual Speech Synthesizer
 function speakVoiceQuick(text) {
   if (!("speechSynthesis" in window)) return;
   window.speechSynthesis.cancel();
   const utterance = new SpeechSynthesisUtterance(text);
   
-  // Set language voice based on character set
   if (/[\u0C00-\u0C7F]/.test(text)) {
-    utterance.lang = "te-IN"; // Telugu script detected
+    utterance.lang = "te-IN";
   } else if (/[\u0900-\u097F]/.test(text)) {
-    utterance.lang = "hi-IN"; // Hindi/Devanagari script detected
+    utterance.lang = "hi-IN";
   } else if (/[\u0B80-\u0BFF]/.test(text)) {
-    utterance.lang = "ta-IN"; // Tamil script detected
+    utterance.lang = "ta-IN";
   } else {
-    utterance.lang = "en-IN"; // Default Indian English
+    utterance.lang = "en-IN";
   }
 
   utterance.rate = 1.15;
@@ -262,7 +325,9 @@ function speakVoiceQuick(text) {
   window.speechSynthesis.speak(utterance);
 }
 
-// 3. Continuous Wake Word Engine ("Hey Jarvis")
+// -------------------------------------------------------------------------
+// CONTINUOUS WAKE WORD ENGINE ("Hey Jarvis")
+// -------------------------------------------------------------------------
 function initWakeWordEngine() {
   if (!SpeechRecognition) return;
 

@@ -1,5 +1,5 @@
 // =========================================================================
-// EPISODE 09: CORE ORB STATES + "HEY JARVIS" SPEECH ENGINE
+// J.A.R.V.I.S. SMART ACTION & SPEECH ENGINE (EPISODE 09/10 UPGRADE)
 // =========================================================================
 
 const WORKER_ENDPOINT = "https://jarvis-automation.saidamvamshi97.workers.dev/api/ask";
@@ -8,32 +8,65 @@ let wakeRecognition = null;
 let commandRecognition = null;
 let isWakeActive = false;
 
-// 1. Visual Orb State Controller
 function setJarvisVisualState(state) {
   const orb = document.querySelector(".orb-inner");
   const ring = document.querySelector(".orb-ring");
   if (!orb) return;
 
-  switch (state) {
-    case "IDLE":
-      orb.style.backgroundColor = "#00ffff";
-      orb.style.boxShadow = "0 0 25px #00ffff";
-      if (ring) ring.style.borderColor = "#00ffff";
-      break;
-    case "LISTENING":
-      orb.style.backgroundColor = "#00ff00";
-      orb.style.boxShadow = "0 0 30px #00ff00";
-      if (ring) ring.style.borderColor = "#00ff00";
-      break;
-    case "THINKING":
-      orb.style.backgroundColor = "#ffa500";
-      orb.style.boxShadow = "0 0 35px #ffa500";
-      if (ring) ring.style.borderColor = "#ffa500";
-      break;
+  if (state === "IDLE") {
+    orb.style.backgroundColor = "#00ffff";
+    orb.style.boxShadow = "0 0 25px #00ffff";
+    if (ring) ring.style.borderColor = "#00ffff";
+  } else if (state === "LISTENING") {
+    orb.style.backgroundColor = "#00ff00";
+    orb.style.boxShadow = "0 0 35px #00ff00";
+    if (ring) ring.style.borderColor = "#00ff00";
+  } else if (state === "THINKING") {
+    orb.style.backgroundColor = "#ffa500";
+    orb.style.boxShadow = "0 0 35px #ffa500";
+    if (ring) ring.style.borderColor = "#ffa500";
   }
 }
 
-// 2. Continuous Hotword Detector ("Hey Jarvis")
+// 1. Action Intent Engine (YouTube, Google, Media)
+function executeDeviceAction(prompt) {
+  const p = prompt.toLowerCase();
+
+  // YouTube Triggers
+  if (p.includes("open youtube") || p.includes("youtube open") || p.includes("play song") || p.includes("youtube")) {
+    let query = "";
+    if (p.includes("play")) {
+      query = p.replace(/.*play/, "").replace("on youtube", "").trim();
+    }
+    
+    document.getElementById("responseBox").innerText = "Opening YouTube, Boss...";
+    speakVoiceFeedback("Opening YouTube now, Boss");
+    
+    setTimeout(() => {
+      if (query) {
+        window.location.href = `https://www.youtube.com/results?search_query=${encodeURIComponent(query)}`;
+      } else {
+        window.location.href = "https://www.youtube.com";
+      }
+    }, 1200);
+    return true;
+  }
+
+  // Google Search Triggers
+  if (p.includes("search google") || p.includes("google search")) {
+    const q = p.replace("search google for", "").replace("search google", "").trim();
+    document.getElementById("responseBox").innerText = "Searching Google...";
+    speakVoiceFeedback("Searching Google for you, Boss");
+    setTimeout(() => {
+      window.location.href = `https://www.google.com/search?q=${encodeURIComponent(q)}`;
+    }, 1200);
+    return true;
+  }
+
+  return false;
+}
+
+// 2. Wake Word Engine ("Hey Jarvis")
 function initWakeWordEngine() {
   const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
   if (!SpeechRecognition) return;
@@ -41,13 +74,14 @@ function initWakeWordEngine() {
   wakeRecognition = new SpeechRecognition();
   wakeRecognition.continuous = true;
   wakeRecognition.interimResults = false;
-  wakeRecognition.lang = "en-US";
+  wakeRecognition.lang = "en-IN"; // Set to Indian accent for better accuracy
 
   wakeRecognition.onresult = (event) => {
     const current = event.resultIndex;
-    const transcript = event.results[current][0].transcript.trim().toLowerCase();
+    const text = event.results[current][0].transcript.trim().toLowerCase();
+    console.log("Wake word hearing:", text);
 
-    if (transcript.includes("hey jarvis") || transcript.includes("jarvis")) {
+    if (text.includes("hey jarvis") || text.includes("jarvis") || text.includes("hai jarvis")) {
       document.getElementById("responseBox").innerText = "Listening to you, Boss...";
       speakVoiceFeedback("Yes Boss?");
       startCommandListening();
@@ -55,31 +89,40 @@ function initWakeWordEngine() {
   };
 
   wakeRecognition.onend = () => {
-    if (isWakeActive) wakeRecognition.start();
+    if (isWakeActive) {
+      try { wakeRecognition.start(); } catch(e){}
+    }
   };
 }
 
-// 3. User Command Listener
+// 3. User Voice Command Listener
 function startCommandListening() {
   const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
   if (!SpeechRecognition) return;
 
   if (wakeRecognition && isWakeActive) {
-    wakeRecognition.stop();
+    try { wakeRecognition.stop(); } catch(e){}
   }
 
   setJarvisVisualState("LISTENING");
   commandRecognition = new SpeechRecognition();
   commandRecognition.continuous = false;
   commandRecognition.interimResults = false;
-  commandRecognition.lang = "en-US";
+  commandRecognition.lang = "en-IN"; // Optimized for regional diction
 
   commandRecognition.onresult = async (event) => {
     const prompt = event.results[0][0].transcript;
     document.getElementById("responseBox").innerText = `"${prompt}"`;
     setJarvisVisualState("THINKING");
 
-    // Call Cloudflare Worker
+    // First check: Is it an Action Command like "Open YouTube"?
+    const isAction = executeDeviceAction(prompt);
+    if (isAction) {
+      setJarvisVisualState("IDLE");
+      return;
+    }
+
+    // Otherwise: Send to Cloudflare Worker Gemini AI
     try {
       const res = await fetch(WORKER_ENDPOINT, {
         method: "POST",
@@ -96,16 +139,19 @@ function startCommandListening() {
 
     setJarvisVisualState("IDLE");
     if (isWakeActive && wakeRecognition) {
-      wakeRecognition.start();
+      try { wakeRecognition.start(); } catch(e){}
     }
   };
 
-  commandRecognition.onerror = () => {
+  commandRecognition.onerror = (e) => {
+    console.error("Speech error:", e);
     setJarvisVisualState("IDLE");
-    if (isWakeActive && wakeRecognition) wakeRecognition.start();
+    if (isWakeActive && wakeRecognition) {
+      try { wakeRecognition.start(); } catch(e){}
+    }
   };
 
-  commandRecognition.start();
+  try { commandRecognition.start(); } catch(e){}
 }
 
 function triggerManualListening() {
@@ -114,8 +160,11 @@ function triggerManualListening() {
 
 function speakVoiceFeedback(text) {
   if ("speechSynthesis" in window) {
+    window.speechSynthesis.cancel();
     const utterance = new SpeechSynthesisUtterance(text);
-    utterance.lang = "en-US";
+    utterance.lang = "en-IN";
+    utterance.rate = 1.0;
+    utterance.pitch = 0.95;
     window.speechSynthesis.speak(utterance);
   }
 }
@@ -136,7 +185,7 @@ function toggleWakeWord() {
     } catch (err) {}
   } else {
     isWakeActive = false;
-    wakeRecognition.stop();
+    try { wakeRecognition.stop(); } catch(e){}
     if (btn) btn.classList.remove("active");
     if (txt) txt.innerText = "Wake Mode: OFF";
     document.getElementById("responseBox").innerText = "Ready for command, Boss...";

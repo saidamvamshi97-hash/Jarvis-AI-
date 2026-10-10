@@ -5,12 +5,13 @@
 }
 
 body {
-  background: #05070e;
+  background: #030712;
   color: #00ffff;
-  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
   height: 100vh;
   overflow: hidden;
   user-select: none;
+  -webkit-tap-highlight-color: transparent;
 }
 
 .jarvis-container {
@@ -19,7 +20,7 @@ body {
   justify-content: space-between;
   align-items: center;
   height: 100%;
-  padding: 24px 16px;
+  padding: 24px 16px 36px 16px;
 }
 
 .top-bar {
@@ -32,29 +33,33 @@ body {
 .status-badge {
   font-size: 11px;
   letter-spacing: 2px;
-  padding: 4px 8px;
+  font-weight: 600;
+  padding: 4px 10px;
   border: 1px solid rgba(0, 255, 255, 0.4);
-  border-radius: 4px;
+  border-radius: 6px;
+  background: rgba(0, 255, 255, 0.05);
 }
 
-/* Episode 09 Wake Button */
 .wake-btn {
   display: flex;
   align-items: center;
   gap: 8px;
-  background: rgba(0, 255, 255, 0.1);
+  background: rgba(0, 255, 255, 0.08);
   border: 1px solid #00ffff;
   color: #00ffff;
-  padding: 6px 14px;
+  padding: 8px 16px;
   border-radius: 20px;
   font-size: 12px;
+  font-weight: 600;
   cursor: pointer;
   transition: all 0.3s ease;
 }
 
 .wake-btn.active {
-  background: rgba(0, 255, 255, 0.3);
-  box-shadow: 0 0 12px #00ffff;
+  background: rgba(0, 255, 119, 0.2);
+  border-color: #00ff77;
+  color: #00ff77;
+  box-shadow: 0 0 14px rgba(0, 255, 119, 0.4);
 }
 
 .wake-btn .dot {
@@ -65,21 +70,20 @@ body {
 }
 
 .wake-btn.active .dot {
-  background-color: #00ff00;
-  box-shadow: 0 0 8px #00ff00;
+  background-color: #00ff77;
+  box-shadow: 0 0 8px #00ff77;
 }
 
-/* Core Orb UI */
 .core-display {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 30px;
+  gap: 28px;
 }
 
 .orb-container {
-  width: 180px;
-  height: 180px;
+  width: 190px;
+  height: 190px;
   position: relative;
   display: flex;
   align-items: center;
@@ -93,48 +97,59 @@ body {
   border-radius: 50%;
   background: radial-gradient(circle, rgba(0,255,255,0.4) 0%, rgba(0,255,255,0) 70%);
   animation: pulse 2.5s infinite ease-in-out;
+  transition: all 0.4s ease;
 }
 
 .orb-ring {
   position: absolute;
-  width: 140px;
-  height: 140px;
+  width: 150px;
+  height: 150px;
   border: 2px dashed #00ffff;
   border-radius: 50%;
-  animation: rotate 10s linear infinite;
+  animation: rotate 12s linear infinite;
+  transition: border-color 0.4s ease;
 }
 
 .orb-inner {
-  width: 80px;
-  height: 80px;
+  width: 85px;
+  height: 85px;
   border-radius: 50%;
   background: #00ffff;
-  box-shadow: 0 0 25px #00ffff;
-  transition: all 0.3s ease;
+  box-shadow: 0 0 28px #00ffff;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 .terminal-box {
-  max-width: 300px;
+  max-width: 320px;
   text-align: center;
-  font-size: 14px;
-  color: #a0f0ff;
-  line-height: 1.5;
-  min-height: 45px;
+  font-size: 15px;
+  color: #e2f8ff;
+  line-height: 1.6;
+  min-height: 50px;
+  padding: 0 10px;
 }
 
 .manual-mic-btn {
-  background: rgba(0, 255, 255, 0.15);
+  background: rgba(0, 255, 255, 0.12);
   border: 1px solid #00ffff;
   color: #00ffff;
-  padding: 10px 24px;
-  border-radius: 25px;
-  font-size: 14px;
+  padding: 12px 30px;
+  border-radius: 30px;
+  font-size: 15px;
+  font-weight: 600;
   cursor: pointer;
+  letter-spacing: 0.5px;
+  transition: all 0.2s ease;
+}
+
+.manual-mic-btn:active {
+  transform: scale(0.96);
+  background: rgba(0, 255, 255, 0.25);
 }
 
 @keyframes pulse {
-  0%, 100% { transform: scale(0.9); opacity: 0.6; }
-  50% { transform: scale(1.1); opacity: 1; }
+  0%, 100% { transform: scale(0.92); opacity: 0.6; }
+  50% { transform: scale(1.08); opacity: 0.95; }
 }
 
 @keyframes rotate {

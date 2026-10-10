@@ -5,6 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
   <title>J.A.R.V.I.S Core</title>
 
+  <!-- PWA Manifest & App Tags -->
   <link rel="manifest" href="manifest.json">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
@@ -34,6 +35,15 @@
     <footer class="bottom-bar">
       <button class="manual-mic-btn" onclick="triggerManualListening()">🎤 Speak</button>
     </footer>
+  </div>
+
+  <!-- Floating HUD Map Overlay -->
+  <div id="floatingMapModal" class="map-modal">
+    <div class="map-header">
+      <span id="mapTitle">NAVIGATION HUD // ACTIVE</span>
+      <button class="map-close-btn" onclick="closeFloatingMap()">✕</button>
+    </div>
+    <iframe id="mapFrame" src="" allowfullscreen="" loading="lazy"></iframe>
   </div>
 
   <script src="script.js"></script>

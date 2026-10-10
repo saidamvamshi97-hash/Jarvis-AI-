@@ -152,7 +152,7 @@ function executeSingleAction(p) {
     }
   }
 
-  // 6. Music & Video Dispatcher (YouTube App Intent or Spotify HUD)
+  // 6. Music & Video Dispatcher (Native YouTube Intent or Spotify HUD)
   const musicTriggers = [
     "play", "paly", "ply", "song", "songs", "paata", "paatalu", "music", "youtube", "spotify",
     "chiranjeevi", "prabhas", "pawan", "kalyan", "rebel", "salaar", "dsp", "anirudh"
@@ -234,7 +234,7 @@ async function interceptLocalAction(rawPrompt) {
 }
 
 // -------------------------------------------------------------------------
-// SPEECH RECOGNITION & BACKEND FAILOVER ROUTER
+// SPEECH RECOGNITION & BACKEND ROUTER
 // -------------------------------------------------------------------------
 function startCommandListening() {
   if (!SpeechRecognition) {
@@ -253,7 +253,7 @@ function startCommandListening() {
   commandRecognition = new SpeechRecognition();
   commandRecognition.continuous = false;
   commandRecognition.interimResults = false;
-  commandRecognition.lang = "en-IN"; // Accurately captures regional names & accents
+  commandRecognition.lang = "en-IN";
 
   commandRecognition.onresult = async (event) => {
     const prompt = event.results[0][0].transcript;
@@ -267,7 +267,7 @@ function startCommandListening() {
       return;
     }
 
-    // 2. Query Cloudflare Backend (Gemini with silent failover to Groq/Llama)
+    // 2. Query Cloudflare Backend
     setJarvisVisualState("THINKING");
 
     try {

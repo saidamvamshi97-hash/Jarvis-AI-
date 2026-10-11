@@ -1,5 +1,5 @@
 // =========================================================================
-// J.A.R.V.I.S. DUAL CORE RUNTIME: 5-SECOND TIMEOUT + SYNCHRONIZED SIRI BUTTON
+// J.A.R.V.I.S. INTERACTIVE RUNTIME: SYNCHRONIZED SIRI ORB + 5S AUTO-CUT TIMER
 // =========================================================================
 
 const WORKER_ENDPOINT = "https://jarvis-automation.saidamvamshi97.workers.dev/api/ask";
@@ -10,11 +10,11 @@ let commandRecognition = null;
 let isWakeActive = false;
 let isCommandActive = false;
 
-// 5-Second Silence / Inactivity Watchdog
-let fiveSecondTimer = null;
-let accumulatedTranscript = "";
+// 5-Second Silence Auto-Cut Timer & Transcript Buffer
+let speechCaptureTimer = null;
+let collectedTranscript = "";
 
-// Web Audio API Context & Spectral Nodes
+// Web Audio & Hardware Analyser Nodes
 let audioCtx = null;
 let micStream = null;
 let analyserNode = null;
@@ -31,9 +31,7 @@ function initAudioEngine() {
 window.addEventListener("touchstart", initAudioEngine, { once: true });
 window.addEventListener("click", initAudioEngine, { once: true });
 
-// -------------------------------------------------------------------------
-// SYNTHESIZED SOUND EFFECTS (Web Audio API)
-// -------------------------------------------------------------------------
+// Synthesized Tone Generator
 function playFuturisticChime(type) {
   try {
     initAudioEngine();
@@ -48,8 +46,8 @@ function playFuturisticChime(type) {
 
     if (type === "WAKE") {
       osc.type = "sine";
-      osc.frequency.setValueAtTime(587.33, now); // D5
-      osc.frequency.exponentialRampToValueAtTime(880, now + 0.12); // A5
+      osc.frequency.setValueAtTime(587.33, now);
+      osc.frequency.exponentialRampToValueAtTime(880, now + 0.12);
       gain.gain.setValueAtTime(0.18, now);
       gain.gain.exponentialRampToValueAtTime(0.001, now + 0.28);
       osc.start(now);
@@ -83,9 +81,7 @@ function triggerHaptic(type) {
   }
 }
 
-// -------------------------------------------------------------------------
-// SYNCHRONIZED VISUAL CONTROLLER (ORB + SIRI BUTTON)
-// -------------------------------------------------------------------------
+// Visual State Controller (Arc Reactor + Siri Button Wrapper)
 function setJarvisVisualState(state) {
   const orb = document.querySelector(".orb-inner");
   const ring = document.querySelector(".orb-ring");
@@ -126,9 +122,7 @@ function updateUI(mainText, debugText) {
   if (debug && debugText) debug.innerText = debugText;
 }
 
-// -------------------------------------------------------------------------
-// HARDWARE SPECTRAL ANALYZER
-// -------------------------------------------------------------------------
+// Real-Time Audio Spectrum Meter
 async function startSpectralTelemetry() {
   try {
     initAudioEngine();
@@ -186,7 +180,7 @@ async function startSpectralTelemetry() {
     }
     renderSpectralLoop();
   } catch (err) {
-    console.warn("Audio Analyser bypass:", err);
+    console.warn("Audio analyser bypass:", err);
   }
 }
 
@@ -382,135 +376,108 @@ async function interceptLocalAction(rawPrompt) {
 }
 
 // -------------------------------------------------------------------------
-// 5-SECOND INACTIVITY RESET WATCHDOG
+// 5-SECOND DYNAMIC COMMAND LISTENER
 // -------------------------------------------------------------------------
-function resetFiveSecondWatchdog() {
-  if (fiveSecondTimer) {
-    clearTimeout(fiveSecondTimer);
-  }
-  // Count down from 5 seconds after speech is detected
-  fiveSecondTimer = setTimeout(() => {
-    if (isCommandActive) {
-      finishAndDispatchListening();
+function resetSilenceTimer() {
+  if (speechCaptureTimer) clearTimeout(speechCaptureTimer);
+
+  // Auto-stops recognition after 5 seconds of silence
+  speechCaptureTimer = setTimeout(() => {
+    if (isCommandActive && commandRecognition) {
+      try {
+        commandRecognition.stop();
+      } catch (err) {}
     }
   }, 5000);
 }
 
-function finishAndDispatchListening() {
-  if (fiveSecondTimer) {
-    clearTimeout(fiveSecondTimer);
-    fiveSecondTimer = null;
-  }
-
-  if (commandRecognition && isCommandActive) {
-    try {
-      commandRecognition.stop();
-    } catch (e) {}
-  }
-
-  const finalPrompt = accumulatedTranscript.trim();
-  accumulatedTranscript = "";
-
-  if (finalPrompt.length > 1) {
-    processFinalSpeechPrompt(finalPrompt);
-  } else {
-    updateUI("Ready for command, Boss.", "5s silence reached. Standing by.");
-    setJarvisVisualState("IDLE");
-    isCommandActive = false;
-    resumeWakeEngine();
-  }
-}
-
-// -------------------------------------------------------------------------
-// SPEECH RECOGNITION (ACCUMULATING WORDS + 5-SECOND TRIGGER)
-// -------------------------------------------------------------------------
 function startCommandListening() {
   if (!SpeechRecognition) return;
 
   isCommandActive = true;
-  accumulatedTranscript = "";
-
+  collectedTranscript = "";
   if (wakeRecognition && isWakeActive) {
     try { wakeRecognition.stop(); } catch (e) {}
   }
 
-  // Activate Visuals & Siri Glow immediately
   setJarvisVisualState("LISTENING");
-  updateUI("Listening...", "Siri Mode Active. Recognizing your words...");
+  updateUI("Listening...", "Siri Mode Active. 5-second silence detection running...");
 
   commandRecognition = new SpeechRecognition();
-  commandRecognition.continuous = true;       // Continuous to capture full sentences
-  commandRecognition.interimResults = true;    // Interim so user sees real-time transcription
+  commandRecognition.continuous = true;
+  commandRecognition.interimResults = true;
   commandRecognition.lang = "en-IN";
 
-  // Start the 5-second silence countdown immediately
-  resetFiveSecondWatchdog();
+  resetSilenceTimer();
 
   commandRecognition.onresult = (event) => {
+    resetSilenceTimer(); // Reset 5s countdown every time a word is spoken
+
     let interim = "";
-    for (let i = event.resultIndex; i < event.results.length; i++) {
-      const transcript = event.results[i][0].transcript;
+    for (let i = event.resultIndex; i < event.results.length; ++i) {
       if (event.results[i].isFinal) {
-        accumulatedTranscript += " " + transcript;
+        collectedTranscript += " " + event.results[i][0].transcript;
       } else {
-        interim += transcript;
+        interim += event.results[i][0].transcript;
       }
     }
 
-    const currentDisplay = (accumulatedTranscript + " " + interim).trim();
-    updateUI(`"${currentDisplay}"`, "Recognizing... (5s silence timer active)");
-
-    // User is speaking: reset the 5-second inactivity timer
-    resetFiveSecondWatchdog();
+    const currentText = (collectedTranscript + " " + interim).trim();
+    if (currentText) {
+      updateUI(`"${currentText}"`, "Recording speech...");
+    }
   };
 
   commandRecognition.onerror = (e) => {
     if (e.error !== "no-speech") {
-      console.warn("Command error:", e.error);
+      updateUI("Listening interrupted.", `Mic Status: ${e.error}`);
     }
   };
 
-  commandRecognition.onend = () => {
-    if (isCommandActive && accumulatedTranscript.trim().length > 1) {
-      finishAndDispatchListening();
-    } else {
-      isCommandActive = false;
+  commandRecognition.onend = async () => {
+    if (speechCaptureTimer) clearTimeout(speechCaptureTimer);
+    isCommandActive = false;
+
+    const finalQuery = collectedTranscript.trim();
+
+    if (!finalQuery) {
+      setJarvisVisualState("IDLE");
+      updateUI("Ready for command, Boss.", "No voice detected.");
       resumeWakeEngine();
+      return;
     }
+
+    updateUI(`"${finalQuery}"`, "Processing query...");
+
+    const wasHandled = await interceptLocalAction(finalQuery);
+    if (wasHandled) {
+      setJarvisVisualState("IDLE");
+      resumeWakeEngine();
+      return;
+    }
+
+    setJarvisVisualState("THINKING");
+    playFuturisticChime("PROCESSING");
+
+    try {
+      const res = await fetch(WORKER_ENDPOINT, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ prompt: finalQuery })
+      });
+      const data = await res.json();
+      const reply = data.reply || "Done, Boss.";
+      updateUI(reply, "Cloud AI Answered");
+      speakVoiceQuick(reply);
+    } catch (err) {
+      updateUI("Systems link timeout, Boss.", `Error: ${err.message}`);
+    }
+
+    setJarvisVisualState("IDLE");
+    resumeWakeEngine();
   };
 
   try { commandRecognition.start(); } catch (e) {}
-}
-
-async function processFinalSpeechPrompt(prompt) {
-  const wasHandled = await interceptLocalAction(prompt);
-  if (wasHandled) {
-    setJarvisVisualState("IDLE");
-    isCommandActive = false;
-    resumeWakeEngine();
-    return;
-  }
-
-  setJarvisVisualState("THINKING");
-  playFuturisticChime("PROCESSING");
-
-  try {
-    const res = await fetch(WORKER_ENDPOINT, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ prompt })
-    });
-    const data = await res.json();
-    const reply = data.reply || "Done, Boss.";
-    updateUI(reply, "Cloud AI Answered");
-    speakVoiceQuick(reply);
-  } catch (err) {
-    updateUI("Systems link timeout, Boss.", `Error: ${err.message}`);
-  }
-
-  setJarvisVisualState("IDLE");
-  isCommandActive = false;
-  resumeWakeEngine();
 }
 
 function resumeWakeEngine() {
@@ -562,25 +529,21 @@ function initWakeWordEngine() {
     const wakeRegex = /\b(hey jarvis|jarvis|hai jarvis|ok jarvis|hi jarvis)\b/i;
 
     if (wakeRegex.test(text)) {
-      // 1. Immediately activate Siri glowing ring
       setJarvisVisualState("LISTENING");
       playFuturisticChime("WAKE");
       triggerHaptic("WAKE");
 
       updateUI("Yes Boss?", "Wake Word Authenticated");
       speakVoiceQuick("Yes Boss?");
-
-      // 2. Check if a command was spoken in the same breath
+      
       const directCommand = text.replace(wakeRegex, "").trim();
       if (directCommand.length > 2) {
-        accumulatedTranscript = directCommand;
-        resetFiveSecondWatchdog();
+        handleDirectCommand(directCommand);
+      } else {
+        setTimeout(() => {
+          startCommandListening();
+        }, 600);
       }
-
-      // 3. Keep recognizing words until 5 seconds of silence
-      setTimeout(() => {
-        startCommandListening();
-      }, 500);
     } else {
       const debug = document.getElementById("debugBox");
       if (debug) debug.innerText = `Ignored Ambient: "${text}"`;
@@ -598,6 +561,37 @@ function initWakeWordEngine() {
       }, 250);
     }
   };
+}
+
+async function handleDirectCommand(prompt) {
+  updateUI(`"${prompt}"`, `Direct Prompt: "${prompt}"`);
+  
+  const wasHandled = await interceptLocalAction(prompt);
+  if (wasHandled) {
+    setJarvisVisualState("IDLE");
+    resumeWakeEngine();
+    return;
+  }
+
+  setJarvisVisualState("THINKING");
+  playFuturisticChime("PROCESSING");
+
+  try {
+    const res = await fetch(WORKER_ENDPOINT, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ prompt })
+    });
+    const data = await res.json();
+    const reply = data.reply || "Done, Boss.";
+    updateUI(reply, "Cloud AI Answered");
+    speakVoiceQuick(reply);
+  } catch (err) {
+    updateUI("Systems link timeout, Boss.", `Error: ${err.message}`);
+  }
+
+  setJarvisVisualState("IDLE");
+  resumeWakeEngine();
 }
 
 async function toggleWakeWord() {
@@ -652,7 +646,6 @@ function setupSiriButton() {
     touchStartTime = Date.now();
     isHoldingButton = false;
 
-    // Barge-in: Cut active voice immediately
     if ("speechSynthesis" in window) {
       window.speechSynthesis.cancel();
     }
@@ -675,11 +668,12 @@ function setupSiriButton() {
     const pressDuration = Date.now() - touchStartTime;
 
     if (pressDuration > 350 || isHoldingButton) {
-      // Released hold: Process accumulated speech immediately
-      finishAndDispatchListening();
+      if (commandRecognition && isCommandActive) {
+        try { commandRecognition.stop(); } catch (err) {}
+      }
       if ("vibrate" in navigator) navigator.vibrate(20);
     } else {
-      updateUI("Listening...", "Siri Mode: Speak your request (5s silence auto-dispatches)...");
+      updateUI("Listening...", "Siri Mode: Tap active, speak request...");
     }
   };
 

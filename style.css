@@ -7,7 +7,7 @@
 body {
   background: #020617;
   color: #00ffff;
-  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Orbitron", monospace;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, monospace;
   height: 100vh;
   overflow: hidden;
   user-select: none;
@@ -25,7 +25,6 @@ body {
   z-index: 1;
 }
 
-/* Background HUD Grid Scanline */
 .jarvis-container::before {
   content: " ";
   position: absolute;
@@ -52,7 +51,6 @@ body {
   border: 1px solid rgba(0, 255, 255, 0.4);
   border-radius: 6px;
   background: rgba(0, 255, 255, 0.05);
-  box-shadow: inset 0 0 10px rgba(0, 255, 255, 0.1);
 }
 
 .wake-btn {
@@ -82,7 +80,6 @@ body {
   height: 8px;
   border-radius: 50%;
   background-color: #555;
-  transition: all 0.3s ease;
 }
 
 .wake-btn.active .dot {
@@ -90,9 +87,6 @@ body {
   box-shadow: 0 0 10px #00ff77;
 }
 
-/* =========================================================================
-   FUTURISTIC ARC REACTOR & RADAR SCANNER
-   ========================================================================= */
 .core-display {
   display: flex;
   flex-direction: column;
@@ -132,7 +126,6 @@ body {
   border-radius: 50%;
   background: radial-gradient(circle, rgba(0,255,255,0.4) 0%, rgba(0,255,255,0) 70%);
   animation: pulse 2.5s infinite ease-in-out;
-  transition: all 0.3s ease;
 }
 
 .orb-ring {
@@ -142,7 +135,6 @@ body {
   border: 2px dashed #00ffff;
   border-radius: 50%;
   animation: rotateClockwise 14s linear infinite;
-  transition: all 0.4s ease;
 }
 
 .orb-outer-reticle {
@@ -163,7 +155,6 @@ body {
   transition: transform 0.08s ease, background-color 0.3s ease, box-shadow 0.3s ease;
 }
 
-/* Audio Frequency & HUD telemetry bar */
 .hud-telemetry {
   display: flex;
   align-items: center;
@@ -171,7 +162,6 @@ body {
   font-size: 11px;
   color: rgba(0, 255, 255, 0.75);
   letter-spacing: 1.5px;
-  margin-top: -6px;
 }
 
 .hud-signal-bar {
@@ -204,25 +194,88 @@ body {
   letter-spacing: 0.5px;
 }
 
-.manual-mic-btn {
-  background: rgba(0, 255, 255, 0.12);
-  border: 1px solid #00ffff;
-  color: #00ffff;
-  padding: 12px 34px;
-  border-radius: 30px;
-  font-size: 15px;
-  font-weight: 600;
+/* =========================================================================
+   SIRI ANIMATED BUTTON & HALO GLOW
+   ========================================================================= */
+.bottom-bar {
+  width: 100%;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  padding-bottom: 8px;
+  z-index: 10;
+}
+
+.siri-button-wrapper {
+  position: relative;
+  width: 84px;
+  height: 84px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.siri-halo-ring {
+  position: absolute;
+  width: 78px;
+  height: 78px;
+  border-radius: 50%;
+  background: conic-gradient(from 180deg at 50% 50%, #00ffff, #0077ff, #ff007f, #00ffff);
+  filter: blur(12px);
+  opacity: 0.35;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  animation: siriSpin 6s linear infinite;
+}
+
+.siri-speak-btn {
+  position: relative;
+  width: 66px;
+  height: 66px;
+  border-radius: 50%;
+  background: radial-gradient(circle at 35% 35%, #1e293b, #030712);
+  border: 1px solid rgba(0, 255, 255, 0.5);
+  box-shadow: inset 0 2px 4px rgba(255, 255, 255, 0.2), 0 8px 24px rgba(0, 0, 0, 0.6);
+  display: flex;
+  align-items: center;
+  justify-content: center;
   cursor: pointer;
-  letter-spacing: 0.5px;
-  transition: all 0.2s ease;
+  outline: none;
+  touch-action: none;
+  transition: transform 0.15s ease, border-color 0.2s ease;
 }
 
-.manual-mic-btn:active {
-  transform: scale(0.96);
-  background: rgba(0, 255, 255, 0.25);
+.siri-core-wave {
+  position: absolute;
+  width: 100%;
+  height: 100%;
+  border-radius: 50%;
 }
 
-/* Universal Modal HUD */
+.mic-icon {
+  font-size: 26px;
+  filter: drop-shadow(0 0 6px rgba(0, 255, 255, 0.8));
+  pointer-events: none;
+}
+
+.siri-button-wrapper.active .siri-halo-ring {
+  width: 114px;
+  height: 114px;
+  opacity: 0.95;
+  filter: blur(16px);
+  animation: siriPulse 1s ease-in-out infinite alternate, siriSpin 3s linear infinite;
+}
+
+.siri-button-wrapper.active .siri-speak-btn {
+  transform: scale(0.92);
+  border-color: #00ff77;
+  box-shadow: 0 0 28px rgba(0, 255, 119, 0.7);
+}
+
+.siri-button-wrapper.active .mic-icon {
+  transform: scale(1.15);
+}
+
+/* Modals */
 .floating-hud-modal {
   display: none;
   position: fixed;
@@ -302,4 +355,13 @@ body {
 
 @keyframes radarScan {
   100% { transform: rotate(360deg); }
+}
+
+@keyframes siriSpin {
+  100% { transform: rotate(360deg); }
+}
+
+@keyframes siriPulse {
+  0% { transform: scale(0.9); opacity: 0.7; }
+  100% { transform: scale(1.25); opacity: 1; }
 }

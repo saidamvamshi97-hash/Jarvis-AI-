@@ -1,5 +1,6 @@
 // =========================================================================
 // J.A.R.V.I.S. INTERACTIVE RUNTIME: SYNCHRONIZED SIRI ORB + 5S AUTO-CUT TIMER
+// (EXCLUSIVE ANDROID SPEECH RECOGNITION PIPELINE - NO MIC HARDWARE CONFLICT)
 // =========================================================================
 
 const WORKER_ENDPOINT = "https://jarvis-automation.saidamvamshi97.workers.dev/api/ask";
@@ -14,11 +15,8 @@ let isCommandActive = false;
 let speechCaptureTimer = null;
 let collectedTranscript = "";
 
-// Web Audio & Hardware Analyser Nodes
+// Web Audio Synthesizer Context
 let audioCtx = null;
-let micStream = null;
-let analyserNode = null;
-let animFrameId = null;
 
 function initAudioEngine() {
   if (!audioCtx) {
@@ -31,7 +29,7 @@ function initAudioEngine() {
 window.addEventListener("touchstart", initAudioEngine, { once: true });
 window.addEventListener("click", initAudioEngine, { once: true });
 
-// Synthesized Tone Generator
+// Synthesized Tone Generator (Web Audio API)
 function playFuturisticChime(type) {
   try {
     initAudioEngine();
@@ -92,6 +90,7 @@ function setJarvisVisualState(state) {
     if (orb) {
       orb.style.backgroundColor = "#00ffff";
       orb.style.boxShadow = "0 0 28px #00ffff";
+      orb.style.transform = "scale(1)";
     }
     if (ring) ring.style.borderColor = "#00ffff";
     if (glow) glow.style.background = "radial-gradient(circle, rgba(0,255,255,0.4) 0%, rgba(0,255,255,0) 70%)";
@@ -100,6 +99,7 @@ function setJarvisVisualState(state) {
     if (orb) {
       orb.style.backgroundColor = "#00ff77";
       orb.style.boxShadow = "0 0 38px #00ff77";
+      orb.style.transform = "scale(1.15)";
     }
     if (ring) ring.style.borderColor = "#00ff77";
     if (glow) glow.style.background = "radial-gradient(circle, rgba(0,255,119,0.5) 0%, rgba(0,255,119,0) 70%)";
@@ -108,6 +108,7 @@ function setJarvisVisualState(state) {
     if (orb) {
       orb.style.backgroundColor = "#ff9900";
       orb.style.boxShadow = "0 0 45px #ff9900";
+      orb.style.transform = "scale(1.05)";
     }
     if (ring) ring.style.borderColor = "#ff9900";
     if (glow) glow.style.background = "radial-gradient(circle, rgba(255,153,0,0.5) 0%, rgba(255,153,0) 70%)";
@@ -120,85 +121,6 @@ function updateUI(mainText, debugText) {
   const debug = document.getElementById("debugBox");
   if (box) box.innerText = mainText;
   if (debug && debugText) debug.innerText = debugText;
-}
-
-// Real-Time Audio Spectrum Meter
-async function startSpectralTelemetry() {
-  try {
-    initAudioEngine();
-    micStream = await navigator.mediaDevices.getUserMedia({
-      audio: {
-        echoCancellation: true,
-        noiseSuppression: true,
-        autoGainControl: true
-      }
-    });
-
-    const source = audioCtx.createMediaStreamSource(micStream);
-    analyserNode = audioCtx.createAnalyser();
-    analyserNode.fftSize = 256;
-    source.connect(analyserNode);
-
-    const bufferLength = analyserNode.frequencyBinCount;
-    const dataArray = new Uint8Array(bufferLength);
-
-    const orbInner = document.querySelector(".orb-inner");
-    const signalFill = document.getElementById("hudSignalFill");
-    const dbText = document.getElementById("dbLevelText");
-    const hzText = document.getElementById("hzLevelText");
-
-    function renderSpectralLoop() {
-      if (!isWakeActive && !isCommandActive) return;
-      analyserNode.getByteFrequencyData(dataArray);
-
-      let sum = 0;
-      let maxVal = 0;
-      for (let i = 0; i < bufferLength; i++) {
-        sum += dataArray[i];
-        if (dataArray[i] > maxVal) maxVal = dataArray[i];
-      }
-      const average = sum / bufferLength;
-
-      const scaleFactor = 1 + (average / 255) * 0.45;
-      if (orbInner) {
-        orbInner.style.transform = `scale(${scaleFactor.toFixed(2)})`;
-      }
-
-      if (signalFill) {
-        signalFill.style.width = `${Math.min(100, average * 2.2)}%`;
-      }
-      if (dbText) {
-        const dB = Math.round(average ? 20 * Math.log10(average / 255) : -60);
-        dbText.innerText = `${dB} dB`;
-      }
-      if (hzText) {
-        const estHz = Math.round(maxVal * 16.5);
-        hzText.innerText = `${estHz} Hz`;
-      }
-
-      animFrameId = requestAnimationFrame(renderSpectralLoop);
-    }
-    renderSpectralLoop();
-  } catch (err) {
-    console.warn("Audio analyser bypass:", err);
-  }
-}
-
-function stopSpectralTelemetry() {
-  if (animFrameId) cancelAnimationFrame(animFrameId);
-  if (micStream) {
-    micStream.getTracks().forEach(t => t.stop());
-    micStream = null;
-  }
-  const orbInner = document.querySelector(".orb-inner");
-  const signalFill = document.getElementById("hudSignalFill");
-  const dbText = document.getElementById("dbLevelText");
-  const hzText = document.getElementById("hzLevelText");
-
-  if (orbInner) orbInner.style.transform = "scale(1)";
-  if (signalFill) signalFill.style.width = "0%";
-  if (dbText) dbText.innerText = "-INF dB";
-  if (hzText) hzText.innerText = "000 Hz";
 }
 
 // -------------------------------------------------------------------------
@@ -602,7 +524,6 @@ async function toggleWakeWord() {
   const orb = document.getElementById("orbCore");
 
   if (!isWakeActive) {
-    await startSpectralTelemetry();
     try {
       wakeRecognition.start();
       isWakeActive = true;
@@ -613,11 +534,12 @@ async function toggleWakeWord() {
       if (txt) txt.innerText = "Wake Mode: ON";
       if (orb) orb.classList.add("wake-active");
       updateUI("Wake Mode Active", "Say 'Hey Jarvis' at any time...");
-    } catch (err) {}
+    } catch (err) {
+      console.warn("Wake init error:", err);
+    }
   } else {
     isWakeActive = false;
     try { wakeRecognition.stop(); } catch (e) {}
-    stopSpectralTelemetry();
     playFuturisticChime("OFF");
     triggerHaptic("OFF");
 
@@ -669,7 +591,9 @@ function setupSiriButton() {
 
     if (pressDuration > 350 || isHoldingButton) {
       if (commandRecognition && isCommandActive) {
-        try { commandRecognition.stop(); } catch (err) {}
+        try {
+          commandRecognition.stop();
+        } catch (err) {}
       }
       if ("vibrate" in navigator) navigator.vibrate(20);
     } else {

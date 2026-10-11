@@ -1,5 +1,5 @@
 // =========================================================================
-// J.A.R.V.I.S. FUTURISTIC RUNTIME: SOUND SYNTHESIS + SPECTRAL ANALYZER + HAPTICS
+// J.A.R.V.I.S. DUAL CORE RUNTIME: 5-SECOND TIMEOUT + SYNCHRONIZED SIRI BUTTON
 // =========================================================================
 
 const WORKER_ENDPOINT = "https://jarvis-automation.saidamvamshi97.workers.dev/api/ask";
@@ -10,13 +10,16 @@ let commandRecognition = null;
 let isWakeActive = false;
 let isCommandActive = false;
 
-// Audio Context & Hardware Spectral Nodes
+// 5-Second Silence / Inactivity Watchdog
+let fiveSecondTimer = null;
+let accumulatedTranscript = "";
+
+// Web Audio API Context & Spectral Nodes
 let audioCtx = null;
 let micStream = null;
 let analyserNode = null;
 let animFrameId = null;
 
-// Initialize Web Audio Context on first tap
 function initAudioEngine() {
   if (!audioCtx) {
     audioCtx = new (window.AudioContext || window.webkitAudioContext)();
@@ -29,7 +32,7 @@ window.addEventListener("touchstart", initAudioEngine, { once: true });
 window.addEventListener("click", initAudioEngine, { once: true });
 
 // -------------------------------------------------------------------------
-// SYNTHESIZED SOUND GENERATOR (Zero Audio Files Needed)
+// SYNTHESIZED SOUND EFFECTS (Web Audio API)
 // -------------------------------------------------------------------------
 function playFuturisticChime(type) {
   try {
@@ -44,7 +47,6 @@ function playFuturisticChime(type) {
     const now = audioCtx.currentTime;
 
     if (type === "WAKE") {
-      // High-tech Dual Sine Glissando
       osc.type = "sine";
       osc.frequency.setValueAtTime(587.33, now); // D5
       osc.frequency.exponentialRampToValueAtTime(880, now + 0.12); // A5
@@ -53,7 +55,6 @@ function playFuturisticChime(type) {
       osc.start(now);
       osc.stop(now + 0.28);
     } else if (type === "PROCESSING") {
-      // Tech Tri-tone Click
       osc.type = "triangle";
       osc.frequency.setValueAtTime(440, now);
       osc.frequency.exponentialRampToValueAtTime(1320, now + 0.1);
@@ -62,7 +63,6 @@ function playFuturisticChime(type) {
       osc.start(now);
       osc.stop(now + 0.15);
     } else if (type === "OFF") {
-      // Power-down pitch drop
       osc.type = "sawtooth";
       osc.frequency.setValueAtTime(520, now);
       osc.frequency.exponentialRampToValueAtTime(120, now + 0.25);
@@ -74,20 +74,60 @@ function playFuturisticChime(type) {
   } catch (e) {}
 }
 
-// -------------------------------------------------------------------------
-// HAPTIC ENGINE
-// -------------------------------------------------------------------------
 function triggerHaptic(type) {
   if (!("vibrate" in navigator)) return;
   if (type === "WAKE") {
-    navigator.vibrate([40, 60, 50]); // Stark double-pulse
+    navigator.vibrate([40, 60, 50]);
   } else if (type === "OFF") {
     navigator.vibrate(30);
   }
 }
 
 // -------------------------------------------------------------------------
-// REAL-TIME VOICE VISUALIZER & DB SENSITIVITY
+// SYNCHRONIZED VISUAL CONTROLLER (ORB + SIRI BUTTON)
+// -------------------------------------------------------------------------
+function setJarvisVisualState(state) {
+  const orb = document.querySelector(".orb-inner");
+  const ring = document.querySelector(".orb-ring");
+  const glow = document.querySelector(".orb-glow");
+  const siriWrapper = document.querySelector(".siri-button-wrapper");
+
+  if (state === "IDLE") {
+    if (orb) {
+      orb.style.backgroundColor = "#00ffff";
+      orb.style.boxShadow = "0 0 28px #00ffff";
+    }
+    if (ring) ring.style.borderColor = "#00ffff";
+    if (glow) glow.style.background = "radial-gradient(circle, rgba(0,255,255,0.4) 0%, rgba(0,255,255,0) 70%)";
+    if (siriWrapper) siriWrapper.classList.remove("active");
+  } else if (state === "LISTENING") {
+    if (orb) {
+      orb.style.backgroundColor = "#00ff77";
+      orb.style.boxShadow = "0 0 38px #00ff77";
+    }
+    if (ring) ring.style.borderColor = "#00ff77";
+    if (glow) glow.style.background = "radial-gradient(circle, rgba(0,255,119,0.5) 0%, rgba(0,255,119,0) 70%)";
+    if (siriWrapper) siriWrapper.classList.add("active");
+  } else if (state === "THINKING") {
+    if (orb) {
+      orb.style.backgroundColor = "#ff9900";
+      orb.style.boxShadow = "0 0 45px #ff9900";
+    }
+    if (ring) ring.style.borderColor = "#ff9900";
+    if (glow) glow.style.background = "radial-gradient(circle, rgba(255,153,0,0.5) 0%, rgba(255,153,0) 70%)";
+    if (siriWrapper) siriWrapper.classList.add("active");
+  }
+}
+
+function updateUI(mainText, debugText) {
+  const box = document.getElementById("responseBox");
+  const debug = document.getElementById("debugBox");
+  if (box) box.innerText = mainText;
+  if (debug && debugText) debug.innerText = debugText;
+}
+
+// -------------------------------------------------------------------------
+// HARDWARE SPECTRAL ANALYZER
 // -------------------------------------------------------------------------
 async function startSpectralTelemetry() {
   try {
@@ -125,13 +165,11 @@ async function startSpectralTelemetry() {
       }
       const average = sum / bufferLength;
 
-      // Real-time Audio Reactive Core Scaling
       const scaleFactor = 1 + (average / 255) * 0.45;
       if (orbInner) {
         orbInner.style.transform = `scale(${scaleFactor.toFixed(2)})`;
       }
 
-      // Live Telemetry Bar & Frequency
       if (signalFill) {
         signalFill.style.width = `${Math.min(100, average * 2.2)}%`;
       }
@@ -167,40 +205,6 @@ function stopSpectralTelemetry() {
   if (signalFill) signalFill.style.width = "0%";
   if (dbText) dbText.innerText = "-INF dB";
   if (hzText) hzText.innerText = "000 Hz";
-}
-
-// -------------------------------------------------------------------------
-// CORE VISUAL STATES
-// -------------------------------------------------------------------------
-function setJarvisVisualState(state) {
-  const orb = document.querySelector(".orb-inner");
-  const ring = document.querySelector(".orb-ring");
-  const glow = document.querySelector(".orb-glow");
-  if (!orb) return;
-
-  if (state === "IDLE") {
-    orb.style.backgroundColor = "#00ffff";
-    orb.style.boxShadow = "0 0 28px #00ffff";
-    if (ring) ring.style.borderColor = "#00ffff";
-    if (glow) glow.style.background = "radial-gradient(circle, rgba(0,255,255,0.4) 0%, rgba(0,255,255,0) 70%)";
-  } else if (state === "LISTENING") {
-    orb.style.backgroundColor = "#00ff77";
-    orb.style.boxShadow = "0 0 38px #00ff77";
-    if (ring) ring.style.borderColor = "#00ff77";
-    if (glow) glow.style.background = "radial-gradient(circle, rgba(0,255,119,0.5) 0%, rgba(0,255,119,0) 70%)";
-  } else if (state === "THINKING") {
-    orb.style.backgroundColor = "#ff9900";
-    orb.style.boxShadow = "0 0 45px #ff9900";
-    if (ring) ring.style.borderColor = "#ff9900";
-    if (glow) glow.style.background = "radial-gradient(circle, rgba(255,153,0,0.5) 0%, rgba(255,153,0) 70%)";
-  }
-}
-
-function updateUI(mainText, debugText) {
-  const box = document.getElementById("responseBox");
-  const debug = document.getElementById("debugBox");
-  if (box) box.innerText = mainText;
-  if (debug && debugText) debug.innerText = debugText;
 }
 
 // -------------------------------------------------------------------------
@@ -378,74 +382,135 @@ async function interceptLocalAction(rawPrompt) {
 }
 
 // -------------------------------------------------------------------------
-// SPEECH RECOGNITION (COMMAND CAPTURE)
+// 5-SECOND INACTIVITY RESET WATCHDOG
 // -------------------------------------------------------------------------
-function startCommandListening() {
-  if (!SpeechRecognition) {
-    alert("SpeechRecognition unsupported. Please open in Google Chrome.");
-    return;
+function resetFiveSecondWatchdog() {
+  if (fiveSecondTimer) {
+    clearTimeout(fiveSecondTimer);
+  }
+  // Count down from 5 seconds after speech is detected
+  fiveSecondTimer = setTimeout(() => {
+    if (isCommandActive) {
+      finishAndDispatchListening();
+    }
+  }, 5000);
+}
+
+function finishAndDispatchListening() {
+  if (fiveSecondTimer) {
+    clearTimeout(fiveSecondTimer);
+    fiveSecondTimer = null;
   }
 
+  if (commandRecognition && isCommandActive) {
+    try {
+      commandRecognition.stop();
+    } catch (e) {}
+  }
+
+  const finalPrompt = accumulatedTranscript.trim();
+  accumulatedTranscript = "";
+
+  if (finalPrompt.length > 1) {
+    processFinalSpeechPrompt(finalPrompt);
+  } else {
+    updateUI("Ready for command, Boss.", "5s silence reached. Standing by.");
+    setJarvisVisualState("IDLE");
+    isCommandActive = false;
+    resumeWakeEngine();
+  }
+}
+
+// -------------------------------------------------------------------------
+// SPEECH RECOGNITION (ACCUMULATING WORDS + 5-SECOND TRIGGER)
+// -------------------------------------------------------------------------
+function startCommandListening() {
+  if (!SpeechRecognition) return;
+
   isCommandActive = true;
+  accumulatedTranscript = "";
+
   if (wakeRecognition && isWakeActive) {
     try { wakeRecognition.stop(); } catch (e) {}
   }
 
+  // Activate Visuals & Siri Glow immediately
   setJarvisVisualState("LISTENING");
-  updateUI("Listening...", "Mic active. Speak clearly...");
+  updateUI("Listening...", "Siri Mode Active. Recognizing your words...");
 
   commandRecognition = new SpeechRecognition();
-  commandRecognition.continuous = false;
-  commandRecognition.interimResults = false;
+  commandRecognition.continuous = true;       // Continuous to capture full sentences
+  commandRecognition.interimResults = true;    // Interim so user sees real-time transcription
   commandRecognition.lang = "en-IN";
 
-  commandRecognition.onresult = async (event) => {
-    const prompt = event.results[0][0].transcript;
-    updateUI(`"${prompt}"`, `Captured: "${prompt}"`);
+  // Start the 5-second silence countdown immediately
+  resetFiveSecondWatchdog();
 
-    const wasHandled = await interceptLocalAction(prompt);
-    if (wasHandled) {
-      setJarvisVisualState("IDLE");
-      isCommandActive = false;
-      resumeWakeEngine();
-      return;
+  commandRecognition.onresult = (event) => {
+    let interim = "";
+    for (let i = event.resultIndex; i < event.results.length; i++) {
+      const transcript = event.results[i][0].transcript;
+      if (event.results[i].isFinal) {
+        accumulatedTranscript += " " + transcript;
+      } else {
+        interim += transcript;
+      }
     }
 
-    setJarvisVisualState("THINKING");
-    playFuturisticChime("PROCESSING");
+    const currentDisplay = (accumulatedTranscript + " " + interim).trim();
+    updateUI(`"${currentDisplay}"`, "Recognizing... (5s silence timer active)");
 
-    try {
-      const res = await fetch(WORKER_ENDPOINT, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ prompt })
-      });
-      const data = await res.json();
-      const reply = data.reply || "Done, Boss.";
-      updateUI(reply, "Cloud AI Answered");
-      speakVoiceQuick(reply);
-    } catch (err) {
-      updateUI("Systems link timeout, Boss.", `Error: ${err.message}`);
-    }
-
-    setJarvisVisualState("IDLE");
-    isCommandActive = false;
-    resumeWakeEngine();
+    // User is speaking: reset the 5-second inactivity timer
+    resetFiveSecondWatchdog();
   };
 
   commandRecognition.onerror = (e) => {
-    updateUI("Listening interrupted.", `Mic Status: ${e.error}`);
-    setJarvisVisualState("IDLE");
-    isCommandActive = false;
-    resumeWakeEngine();
+    if (e.error !== "no-speech") {
+      console.warn("Command error:", e.error);
+    }
   };
 
   commandRecognition.onend = () => {
-    isCommandActive = false;
-    resumeWakeEngine();
+    if (isCommandActive && accumulatedTranscript.trim().length > 1) {
+      finishAndDispatchListening();
+    } else {
+      isCommandActive = false;
+      resumeWakeEngine();
+    }
   };
 
   try { commandRecognition.start(); } catch (e) {}
+}
+
+async function processFinalSpeechPrompt(prompt) {
+  const wasHandled = await interceptLocalAction(prompt);
+  if (wasHandled) {
+    setJarvisVisualState("IDLE");
+    isCommandActive = false;
+    resumeWakeEngine();
+    return;
+  }
+
+  setJarvisVisualState("THINKING");
+  playFuturisticChime("PROCESSING");
+
+  try {
+    const res = await fetch(WORKER_ENDPOINT, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ prompt })
+    });
+    const data = await res.json();
+    const reply = data.reply || "Done, Boss.";
+    updateUI(reply, "Cloud AI Answered");
+    speakVoiceQuick(reply);
+  } catch (err) {
+    updateUI("Systems link timeout, Boss.", `Error: ${err.message}`);
+  }
+
+  setJarvisVisualState("IDLE");
+  isCommandActive = false;
+  resumeWakeEngine();
 }
 
 function resumeWakeEngine() {
@@ -477,7 +542,7 @@ function speakVoiceQuick(text) {
 }
 
 // -------------------------------------------------------------------------
-// FUTURISTIC STRICT WAKE WORD ENGINE
+// PERSISTENT 24/7 WAKE WORD ENGINE ("Hey Jarvis")
 // -------------------------------------------------------------------------
 function initWakeWordEngine() {
   if (!SpeechRecognition) return;
@@ -492,25 +557,30 @@ function initWakeWordEngine() {
     const text = result[0].transcript.trim().toLowerCase();
     const confidence = result[0].confidence;
 
-    // Filter room noise/whispers
-    if (confidence && confidence < 0.65) return;
+    if (confidence && confidence < 0.60) return;
 
     const wakeRegex = /\b(hey jarvis|jarvis|hai jarvis|ok jarvis|hi jarvis)\b/i;
 
     if (wakeRegex.test(text)) {
-      // 1. Audio chime & Stark double-pulse haptic feedback
+      // 1. Immediately activate Siri glowing ring
+      setJarvisVisualState("LISTENING");
       playFuturisticChime("WAKE");
       triggerHaptic("WAKE");
 
       updateUI("Yes Boss?", "Wake Word Authenticated");
       speakVoiceQuick("Yes Boss?");
-      
+
+      // 2. Check if a command was spoken in the same breath
       const directCommand = text.replace(wakeRegex, "").trim();
       if (directCommand.length > 2) {
-        handleDirectCommand(directCommand);
-      } else {
-        startCommandListening();
+        accumulatedTranscript = directCommand;
+        resetFiveSecondWatchdog();
       }
+
+      // 3. Keep recognizing words until 5 seconds of silence
+      setTimeout(() => {
+        startCommandListening();
+      }, 500);
     } else {
       const debug = document.getElementById("debugBox");
       if (debug) debug.innerText = `Ignored Ambient: "${text}"`;
@@ -525,40 +595,9 @@ function initWakeWordEngine() {
     if (isWakeActive && !isCommandActive) {
       setTimeout(() => {
         try { wakeRecognition.start(); } catch (e) {}
-      }, 300);
+      }, 250);
     }
   };
-}
-
-async function handleDirectCommand(prompt) {
-  updateUI(`"${prompt}"`, `Direct Prompt: "${prompt}"`);
-  
-  const wasHandled = await interceptLocalAction(prompt);
-  if (wasHandled) {
-    setJarvisVisualState("IDLE");
-    resumeWakeEngine();
-    return;
-  }
-
-  setJarvisVisualState("THINKING");
-  playFuturisticChime("PROCESSING");
-
-  try {
-    const res = await fetch(WORKER_ENDPOINT, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ prompt })
-    });
-    const data = await res.json();
-    const reply = data.reply || "Done, Boss.";
-    updateUI(reply, "Cloud AI Answered");
-    speakVoiceQuick(reply);
-  } catch (err) {
-    updateUI("Systems link timeout, Boss.", `Error: ${err.message}`);
-  }
-
-  setJarvisVisualState("IDLE");
-  resumeWakeEngine();
 }
 
 async function toggleWakeWord() {
@@ -579,7 +618,7 @@ async function toggleWakeWord() {
       if (btn) btn.classList.add("active");
       if (txt) txt.innerText = "Wake Mode: ON";
       if (orb) orb.classList.add("wake-active");
-      updateUI("Wake Telemetry Active", "Listening strictly for 'Hey Jarvis'...");
+      updateUI("Wake Mode Active", "Say 'Hey Jarvis' at any time...");
     } catch (err) {}
   } else {
     isWakeActive = false;
@@ -596,7 +635,57 @@ async function toggleWakeWord() {
   }
 }
 
-function triggerManualListening() {
-  playFuturisticChime("PROCESSING");
-  startCommandListening();
+// -------------------------------------------------------------------------
+// SIRI BUTTON PUSH-TO-TALK & TAP CONTROLLER
+// -------------------------------------------------------------------------
+let pressTimer = null;
+let isHoldingButton = false;
+let touchStartTime = 0;
+
+function setupSiriButton() {
+  const btn = document.getElementById("siriSpeakBtn");
+  const wrapper = document.querySelector(".siri-button-wrapper");
+  if (!btn || !wrapper) return;
+
+  const handlePointerDown = (e) => {
+    e.preventDefault();
+    touchStartTime = Date.now();
+    isHoldingButton = false;
+
+    // Barge-in: Cut active voice immediately
+    if ("speechSynthesis" in window) {
+      window.speechSynthesis.cancel();
+    }
+
+    playFuturisticChime("WAKE");
+    if ("vibrate" in navigator) navigator.vibrate(35);
+
+    setJarvisVisualState("LISTENING");
+
+    pressTimer = setTimeout(() => {
+      isHoldingButton = true;
+    }, 350);
+
+    startCommandListening();
+  };
+
+  const handlePointerUp = (e) => {
+    e.preventDefault();
+    clearTimeout(pressTimer);
+    const pressDuration = Date.now() - touchStartTime;
+
+    if (pressDuration > 350 || isHoldingButton) {
+      // Released hold: Process accumulated speech immediately
+      finishAndDispatchListening();
+      if ("vibrate" in navigator) navigator.vibrate(20);
+    } else {
+      updateUI("Listening...", "Siri Mode: Speak your request (5s silence auto-dispatches)...");
+    }
+  };
+
+  btn.addEventListener("pointerdown", handlePointerDown);
+  btn.addEventListener("pointerup", handlePointerUp);
+  btn.addEventListener("pointercancel", handlePointerUp);
 }
+
+document.addEventListener("DOMContentLoaded", setupSiriButton);

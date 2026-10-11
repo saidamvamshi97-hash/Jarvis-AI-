@@ -9,7 +9,7 @@
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <meta name="theme-color" content="#00ffff">
 
-  <link rel="stylesheet" href="style.css?v=2026_stark_hud">
+  <link rel="stylesheet" href="style.css?v=2026_siri_5s_hud">
 </head>
 <body>
   <div class="jarvis-container">
@@ -30,7 +30,7 @@
         <div class="orb-inner"></div>
       </div>
 
-      <!-- Real-time Audio Spectrum & Sensitivity HUD -->
+      <!-- Real-time Spectral Telemetry HUD -->
       <div class="hud-telemetry">
         <span id="hzLevelText">000 Hz</span>
         <div class="hud-signal-bar">
@@ -43,8 +43,15 @@
       <div id="debugBox" class="debug-subtext">Waiting for audio input...</div>
     </main>
 
+    <!-- Siri Push-to-Talk Interactive Button -->
     <footer class="bottom-bar">
-      <button class="manual-mic-btn" onclick="triggerManualListening()">🎤 Speak</button>
+      <div class="siri-button-wrapper">
+        <div class="siri-halo-ring"></div>
+        <button id="siriSpeakBtn" class="siri-speak-btn" aria-label="Activate Jarvis">
+          <div class="siri-core-wave"></div>
+          <span class="mic-icon">🎙️</span>
+        </button>
+      </div>
     </footer>
   </div>
 
@@ -68,6 +75,6 @@
     </div>
   </div>
 
-  <script src="script.js?v=2026_stark_hud"></script>
+  <script src="script.js?v=2026_siri_5s_hud"></script>
 </body>
 </html>

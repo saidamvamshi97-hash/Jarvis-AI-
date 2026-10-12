@@ -3,23 +3,30 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <title>J.A.R.V.I.S Core</title>
-
+  <title>J.A.R.V.I.S Core MK-VII</title>
   <meta name="apple-mobile-web-app-capable" content="yes">
-  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-  <meta name="theme-color" content="#00ffff">
-
-  <link rel="stylesheet" href="style.css?v=2026_siri_5s_hud">
+  <meta name="theme-color" content="#020617">
+  <link rel="stylesheet" href="style.css?v=2026_mk7_hud">
 </head>
 <body>
   <div class="jarvis-container">
     <header class="top-bar">
-      <div class="status-badge">ONLINE // 24/7</div>
+      <div class="telemetry-pill">
+        <span class="pulse-indicator"></span>
+        <span id="sysStatus">CORE // MK-VII ONLINE</span>
+      </div>
       <button id="wakeToggleBtn" class="wake-btn" onclick="toggleWakeWord()">
         <span id="wakeStatusDot" class="dot"></span>
         <span id="wakeBtnText">Wake Mode: OFF</span>
       </button>
     </header>
+
+    <!-- Holographic Telemetry Diagnostics Grid -->
+    <div class="hud-top-telemetry">
+      <div class="stat-block"><span class="stat-label">PWR</span><span id="batteryStat">--%</span></div>
+      <div class="stat-block"><span class="stat-label">LINK</span><span id="networkStat">ONLINE</span></div>
+      <div class="stat-block"><span class="stat-label">COGNITION</span><span id="engineStat">DUAL-TIER</span></div>
+    </div>
 
     <main class="core-display">
       <div id="orbCore" class="orb-container">
@@ -30,7 +37,6 @@
         <div class="orb-inner"></div>
       </div>
 
-      <!-- Real-time Spectral Telemetry HUD -->
       <div class="hud-telemetry">
         <span id="hzLevelText">000 Hz</span>
         <div class="hud-signal-bar">
@@ -40,10 +46,9 @@
       </div>
 
       <div id="responseBox" class="terminal-box">Ready for command, Boss...</div>
-      <div id="debugBox" class="debug-subtext">Waiting for audio input...</div>
+      <div id="debugBox" class="debug-subtext">Standing by for voice input...</div>
     </main>
 
-    <!-- Siri Push-to-Talk Interactive Button -->
     <footer class="bottom-bar">
       <div class="siri-button-wrapper">
         <div class="siri-halo-ring"></div>
@@ -55,7 +60,7 @@
     </footer>
   </div>
 
-  <!-- Universal Multi-App HUD Modal -->
+  <!-- Universal Modal HUD -->
   <div id="universalAppModal" class="floating-hud-modal">
     <div class="hud-header">
       <span id="appHudTitle">SYSTEM APP // ACTIVE</span>
@@ -65,16 +70,10 @@
       </div>
     </div>
     <div class="hud-body">
-      <iframe 
-        id="appHudFrame" 
-        src="" 
-        allow="autoplay; encrypted-media; picture-in-picture; geolocation; camera; microphone" 
-        allowfullscreen 
-        loading="lazy">
-      </iframe>
+      <iframe id="appHudFrame" src="" allow="autoplay; encrypted-media; picture-in-picture; geolocation" allowfullscreen></iframe>
     </div>
   </div>
 
-  <script src="script.js?v=2026_siri_5s_hud"></script>
+  <script src="script.js?v=2026_mk7_hud"></script>
 </body>
 </html>

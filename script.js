@@ -1,5 +1,5 @@
 // =========================================================================
-// J.A.R.V.I.S. MK-VII: MALE ROBOTIC VOICE + PERSISTENT WAKE + 5S AUTO-CUT
+// J.A.R.V.I.S. MK-VII RUNTIME: FULL ANDROID NATIVE APP DISPATCHER + VOICE
 // =========================================================================
 
 const WORKER_ENDPOINT = "https://jarvis-automation.saidamvamshi97.workers.dev/api/ask";
@@ -10,7 +10,7 @@ let commandRecognition = null;
 let isWakeActive = false;
 let isCommandActive = false;
 
-// Multi-turn conversational memory cache (retains last 6 interactions)
+// Multi-turn conversational memory cache
 let conversationMemory = [];
 
 // 5-Second Silence Detection
@@ -43,24 +43,19 @@ if ("speechSynthesis" in window) {
   window.speechSynthesis.onvoiceschanged = loadSystemVoices;
 }
 
-// -------------------------------------------------------------------------
-// MALE ROBOTIC VOICE ENGINE (DEEP BARITONE / STARK CADENCE)
-// -------------------------------------------------------------------------
+// Deep Baritone Male Robotic Voice Engine (Stark Cadence)
 function selectRoboticMaleVoice(langCode) {
   if (!availableVoices.length) loadSystemVoices();
 
   const maleKeywords = ["male", "guy", "david", "george", "oliver", "rishi", "google uk english male"];
 
-  // 1. Language matching first
   const langVoices = availableVoices.filter(v => v.lang.toLowerCase().startsWith(langCode.slice(0, 2)));
 
-  // 2. Search for explicit male voices in target language
   const maleMatch = langVoices.find(v => 
     maleKeywords.some(kw => v.name.toLowerCase().includes(kw))
   );
   if (maleMatch) return maleMatch;
 
-  // 3. Fallback: Search globally for UK English male or US English male
   const globalMale = availableVoices.find(v => 
     (v.lang.includes("en-GB") || v.lang.includes("en-US") || v.lang.includes("en-IN")) &&
     maleKeywords.some(kw => v.name.toLowerCase().includes(kw))
@@ -76,7 +71,7 @@ function speakVoiceQuick(text) {
 
   const utterance = new SpeechSynthesisUtterance(text);
 
-  let targetLang = "en-GB"; // UK English gives the signature Stark J.A.R.V.I.S accent
+  let targetLang = "en-GB"; 
   if (/[\u0C00-\u0C7F]/.test(text)) {
     targetLang = "te-IN";
   } else if (/[\u0900-\u097F]/.test(text)) {
@@ -92,16 +87,15 @@ function speakVoiceQuick(text) {
     utterance.voice = maleVoice;
   }
 
-  // Pitch lowered to 0.78 creates the deep robotic resonance
-  utterance.pitch = 0.78;
-  utterance.rate = 1.05;
+  utterance.pitch = 0.78; // Low frequency robotic resonance
+  utterance.rate = 1.05;  // Calculated crisp tempo
   utterance.volume = 1.0;
 
   window.speechSynthesis.speak(utterance);
 }
 
 // -------------------------------------------------------------------------
-// LIVE TELEMETRY & SOUND EFFECTS
+// LIVE TELEMETRY & TONE SYNTHESIS
 // -------------------------------------------------------------------------
 async function updateAmbientTelemetry() {
   const batEl = document.getElementById("batteryStat");
@@ -251,9 +245,65 @@ function closeUniversalApp() {
 }
 
 // -------------------------------------------------------------------------
-// LOCAL COMMAND ENGINE
+// LOCAL COMMAND & ANDROID NATIVE APP DISPATCHER
 // -------------------------------------------------------------------------
 function executeSingleAction(p) {
+  // 1. INSTAGRAM (Direct Android App Intent)
+  if (p.includes("instagram") || p.includes("insta")) {
+    const reply = "Launching Instagram, Boss.";
+    speakVoiceQuick(reply);
+    updateUI(reply, "Dispatched: Instagram");
+    setTimeout(() => {
+      window.location.href = "intent://instagram.com/#Intent;package=com.instagram.android;scheme=https;end";
+    }, 450);
+    return true;
+  }
+
+  // 2. WHATSAPP
+  if (p.includes("whatsapp")) {
+    const reply = "Opening WhatsApp, Boss.";
+    speakVoiceQuick(reply);
+    updateUI(reply, "Dispatched: WhatsApp");
+    setTimeout(() => {
+      window.location.href = "intent://send#Intent;package=com.whatsapp;scheme=whatsapp;end";
+    }, 450);
+    return true;
+  }
+
+  // 3. TELEGRAM
+  if (p.includes("telegram")) {
+    const reply = "Accessing Telegram comms, Boss.";
+    speakVoiceQuick(reply);
+    updateUI(reply, "Dispatched: Telegram");
+    setTimeout(() => {
+      window.location.href = "intent:#Intent;package=org.telegram.messenger;scheme=tg;end";
+    }, 450);
+    return true;
+  }
+
+  // 4. CAMERA
+  if (p.includes("camera") || p.includes("photo") || p.includes("take a picture")) {
+    const reply = "Initializing optical sensors, Boss.";
+    speakVoiceQuick(reply);
+    updateUI(reply, "Dispatched: Camera");
+    setTimeout(() => {
+      window.location.href = "intent:#Intent;action=android.media.action.IMAGE_CAPTURE;end";
+    }, 450);
+    return true;
+  }
+
+  // 5. GMAIL
+  if (p.includes("gmail") || p.includes("email") || p.includes("mail")) {
+    const reply = "Opening incoming mail relays, Boss.";
+    speakVoiceQuick(reply);
+    updateUI(reply, "Dispatched: Gmail");
+    setTimeout(() => {
+      window.location.href = "intent:#Intent;package=com.google.android.gm;scheme=googlegmail;end";
+    }, 450);
+    return true;
+  }
+
+  // 6. BATTERY DIAGNOSTIC
   if (p.includes("battery") || p.includes("charge") || p.includes("power level")) {
     const batEl = document.getElementById("batteryStat");
     const val = batEl ? batEl.innerText : "Nominal";
@@ -263,6 +313,7 @@ function executeSingleAction(p) {
     return true;
   }
 
+  // 7. CLOCK / TIME
   const timeTriggers = ["time", "watch", "clock", "samayam", "time entha", "samay", "neram", "ghadi"];
   if (timeTriggers.some(w => p.includes(w))) {
     const timeStr = new Date().toLocaleTimeString("en-IN", { hour: "numeric", minute: "2-digit", hour12: true });
@@ -272,6 +323,7 @@ function executeSingleAction(p) {
     return true;
   }
 
+  // 8. WEATHER RADAR HUD
   if (p.includes("weather") || p.includes("rain") || p.includes("climate") || p.includes("varsham") || p.includes("mausam")) {
     const reply = "Streaming live radar telemetry, Boss.";
     speakVoiceQuick(reply);
@@ -284,6 +336,7 @@ function executeSingleAction(p) {
     return true;
   }
 
+  // 9. LIVE CRICKET HUD
   if (p.includes("cricket") || p.includes("score") || p.includes("ipl") || p.includes("match")) {
     const reply = "Streaming live cricket scorecard in HUD, Boss.";
     speakVoiceQuick(reply);
@@ -292,6 +345,7 @@ function executeSingleAction(p) {
     return true;
   }
 
+  // 10. CALCULATOR CORE
   if (p.includes("calculator") || p.includes("calculate") || p.includes("lekkalu") || p.includes("hisab")) {
     const reply = "Deploying math processing matrix, Boss.";
     speakVoiceQuick(reply);
@@ -300,6 +354,7 @@ function executeSingleAction(p) {
     return true;
   }
 
+  // 11. WIKIPEDIA INTEL
   if (p.startsWith("wiki") || p.startsWith("who is") || p.startsWith("what is")) {
     const topic = p.replace(/^(wiki|who is|what is|tell me about)/gi, "").trim();
     if (topic.length > 2) {
@@ -311,6 +366,7 @@ function executeSingleAction(p) {
     }
   }
 
+  // 12. YOUTUBE / SPOTIFY STREAMING
   const musicTriggers = ["play", "paly", "ply", "song", "songs", "paata", "paatalu", "music", "youtube", "spotify"];
   if (musicTriggers.some(w => p.includes(w))) {
     let cleanQuery = p
@@ -405,6 +461,7 @@ function startCommandListening() {
       return;
     }
 
+    // 1. Check local actions (Instagram, WhatsApp, YouTube, Battery, Time)
     const handled = executeSingleAction(finalQuery.toLowerCase());
     if (handled) {
       setJarvisVisualState("IDLE");
@@ -412,6 +469,7 @@ function startCommandListening() {
       return;
     }
 
+    // 2. Fallback to Cloud Neural Brain with History
     setJarvisVisualState("THINKING");
     playFuturisticChime("PROCESSING");
 
@@ -479,9 +537,14 @@ function initWakeWordEngine() {
       updateUI("Yes Boss?", "Wake Word Authenticated");
       speakVoiceQuick("Yes Boss?");
 
-      setTimeout(() => {
-        startCommandListening();
-      }, 650);
+      const directCommand = text.replace(wakeRegex, "").trim();
+      if (directCommand.length > 2) {
+        handleDirectCommand(directCommand);
+      } else {
+        setTimeout(() => {
+          startCommandListening();
+        }, 650);
+      }
     } else {
       const debug = document.getElementById("debugBox");
       if (debug) debug.innerText = `Ignored Ambient: "${text}"`;
@@ -499,6 +562,37 @@ function initWakeWordEngine() {
       }, 250);
     }
   };
+}
+
+async function handleDirectCommand(prompt) {
+  updateUI(`"${prompt}"`, `Direct Prompt: "${prompt}"`);
+  
+  const wasHandled = executeSingleAction(prompt.toLowerCase());
+  if (wasHandled) {
+    setJarvisVisualState("IDLE");
+    resumeWakeEngine();
+    return;
+  }
+
+  setJarvisVisualState("THINKING");
+  playFuturisticChime("PROCESSING");
+
+  try {
+    const res = await fetch(WORKER_ENDPOINT, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ prompt, history: conversationMemory })
+    });
+    const data = await res.json();
+    const reply = data.reply || "Done, Boss.";
+    updateUI(reply, "Cloud AI Answered");
+    speakVoiceQuick(reply);
+  } catch (err) {
+    updateUI("Telemetry timeout, Boss.", `Error: ${err.message}`);
+  }
+
+  setJarvisVisualState("IDLE");
+  resumeWakeEngine();
 }
 
 async function toggleWakeWord() {

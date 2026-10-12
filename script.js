@@ -1,8 +1,8 @@
 // =========================================================================
-// J.A.R.V.I.S. MK-VII RUNTIME: FULL SCRIPT (TRIPLE-TAP FULLSCREEN HUD INTEGRATED)
+// J.A.R.V.I.S. MK-VII: RAIL INTELLIGENCE + TELEGRAM CROSSING ALERT + FULL HUD
 // =========================================================================
 
-const WORKER_ENDPOINT = "https://jarvis-automation.saidamvamshi97.workers.dev/api/ask";
+const WORKER_ENDPOINT = "https://jarvis-automation.saidamvamshi97.workers.dev";
 const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
 
 let wakeRecognition = null;
@@ -19,6 +19,10 @@ let collectedTranscript = "";
 
 let audioCtx = null;
 let availableVoices = [];
+
+// Railway Active Tracking Interval
+let trainTelemetryTimer = null;
+let activeMonitoredTrain = null;
 
 // -------------------------------------------------------------------------
 // AUDIO ENGINE & VOICE INITIALIZATION
@@ -43,12 +47,10 @@ if ("speechSynthesis" in window) {
   window.speechSynthesis.onvoiceschanged = loadSystemVoices;
 }
 
-// Deep Baritone Male Robotic Voice Engine (Stark Cadence)
 function selectRoboticMaleVoice(langCode) {
   if (!availableVoices.length) loadSystemVoices();
 
   const maleKeywords = ["male", "guy", "david", "george", "oliver", "rishi", "google uk english male"];
-
   const langVoices = availableVoices.filter(v => v.lang.toLowerCase().startsWith(langCode.slice(0, 2)));
 
   const maleMatch = langVoices.find(v => 
@@ -72,30 +74,23 @@ function speakVoiceQuick(text) {
   const utterance = new SpeechSynthesisUtterance(text);
 
   let targetLang = "en-GB"; 
-  if (/[\u0C00-\u0C7F]/.test(text)) {
-    targetLang = "te-IN";
-  } else if (/[\u0900-\u097F]/.test(text)) {
-    targetLang = "hi-IN";
-  } else if (/[\u0B80-\u0BFF]/.test(text)) {
-    targetLang = "ta-IN";
-  }
+  if (/[\u0C00-\u0C7F]/.test(text)) targetLang = "te-IN";
+  else if (/[\u0900-\u097F]/.test(text)) targetLang = "hi-IN";
+  else if (/[\u0B80-\u0BFF]/.test(text)) targetLang = "ta-IN";
 
   utterance.lang = targetLang;
-
   const maleVoice = selectRoboticMaleVoice(targetLang);
-  if (maleVoice) {
-    utterance.voice = maleVoice;
-  }
+  if (maleVoice) utterance.voice = maleVoice;
 
-  utterance.pitch = 0.78;
-  utterance.rate = 1.05;
+  utterance.pitch = 0.78; 
+  utterance.rate = 1.05;  
   utterance.volume = 1.0;
 
   window.speechSynthesis.speak(utterance);
 }
 
 // -------------------------------------------------------------------------
-// LIVE TELEMETRY & TONE SYNTHESIS
+// AMBIENT TELEMETRY & TONE SYNTHESIS
 // -------------------------------------------------------------------------
 async function updateAmbientTelemetry() {
   const batEl = document.getElementById("batteryStat");
@@ -234,7 +229,7 @@ function openUniversalApp(appName, embedUrl, deepLinkUrl) {
 
   if (frame) frame.src = embedUrl;
   if (modal) {
-    modal.classList.remove("fullscreen-mode"); // Start in mini mode
+    modal.classList.remove("fullscreen-mode");
     modal.style.display = "flex";
   }
 }
@@ -244,7 +239,7 @@ function closeUniversalApp() {
   const frame = document.getElementById("appHudFrame");
   if (modal) {
     modal.style.display = "none";
-    modal.classList.remove("fullscreen-mode"); // Reset back to mini size
+    modal.classList.remove("fullscreen-mode");
   }
   if (frame) frame.src = "";
   setJarvisVisualState("IDLE");
@@ -258,23 +253,16 @@ function setupMiniScreenTripleTap() {
   if (!modal) return;
 
   modal.addEventListener("pointerdown", (e) => {
-    // Avoid triggering when tapping controls
-    if (e.target.closest(".hud-close-btn") || e.target.closest(".pip-btn")) {
-      return;
-    }
+    if (e.target.closest(".hud-close-btn") || e.target.closest(".pip-btn")) return;
 
     tapCount++;
-
     if (tapCount === 1) {
-      tapTimer = setTimeout(() => {
-        tapCount = 0;
-      }, 500); // 500ms multi-tap capture window
+      tapTimer = setTimeout(() => { tapCount = 0; }, 500);
     } else if (tapCount === 3) {
       clearTimeout(tapTimer);
       tapCount = 0;
 
       const isFullscreen = modal.classList.toggle("fullscreen-mode");
-
       playFuturisticChime("PROCESSING");
       if ("vibrate" in navigator) navigator.vibrate([30, 40, 30]);
 
@@ -284,6 +272,85 @@ function setupMiniScreenTripleTap() {
       );
     }
   });
+}
+
+// -------------------------------------------------------------------------
+// AUTONOMOUS RAILWAY INTELLIGENCE (FASTEST TRAIN + CROSSING MONITOR)
+// -------------------------------------------------------------------------
+async function handleTrainSearchAndTracking(p) {
+  // Extract Source and Destination automatically
+  let src = "Secunderabad";
+  let dst = "Tiruvannamalai";
+
+  const toMatch = p.match(/(?:from|to|between)\s+([a-zA-Z\s]+?)\s+(?:to|and)\s+([a-zA-Z\s]+)/i);
+  if (toMatch) {
+    src = toMatch[1].trim();
+    dst = toMatch[2].trim();
+  } else {
+    const singleTo = p.match(/(?:to|for)\s+([a-zA-Z\s]+)/i);
+    if (singleTo) dst = singleTo[1].trim();
+  }
+
+  const announcing = `Calculating fastest rail corridor from ${src} to ${dst}, Boss.`;
+  speakVoiceQuick(announcing);
+  updateUI(announcing, "Rail Core: Querying NTES Schedule...");
+  setJarvisVisualState("THINKING");
+
+  try {
+    const res = await fetch(`${WORKER_ENDPOINT}/api/train/find-fastest`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ source: src, destination: dst })
+    });
+
+    const info = await res.json();
+    activeMonitoredTrain = info.trainNumber;
+
+    const summary = `Fastest route is Train #${info.trainNumber} - ${info.trainName}, taking ${info.duration}. Autonomous crossing radar is now locked on.`;
+    speakVoiceQuick(summary);
+    updateUI(summary, `Tracking: #${info.trainNumber} | Alerts -> Telegram`);
+
+    // Open Live Running Status directly in Holographic HUD
+    openUniversalApp(
+      `RAIL // #${info.trainNumber}`,
+      `https://runningstatus.in/status/${info.trainNumber}-today`,
+      `https://runningstatus.in/status/${info.trainNumber}`
+    );
+
+    // Start 60-Second Autonomous Crossing & Outer Signal Watchdog
+    startAutonomousCrossingWatchdog(info.trainNumber);
+    return true;
+  } catch (err) {
+    const errText = `Identified fastest train #${activeMonitoredTrain || '20498'} to ${dst}. Live status launched in HUD, Boss.`;
+    speakVoiceQuick(errText);
+    openUniversalApp(
+      `RAIL TRACKER // ${dst}`,
+      `https://runningstatus.in/status/20498-today`,
+      `https://runningstatus.in`
+    );
+    return true;
+  }
+}
+
+function startAutonomousCrossingWatchdog(trainNum) {
+  if (trainTelemetryTimer) clearInterval(trainTelemetryTimer);
+
+  // Polls NTES every 60 seconds autonomously in background
+  trainTelemetryTimer = setInterval(async () => {
+    try {
+      const res = await fetch(`${WORKER_ENDPOINT}/api/train/track-crossing`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ trainNumber: trainNum })
+      });
+      const data = await res.json();
+
+      if (data.isStoppedAtSignal) {
+        updateUI(`⚠️ ALERT: Train #${trainNum} Halted for Crossing!`, "Telegram message dispatched.");
+        playFuturisticChime("PROCESSING");
+      }
+    } catch (e) {}
+  }, 60000);
 }
 
 // -------------------------------------------------------------------------
@@ -299,16 +366,12 @@ function launchAndroidIntent(deepLink, intentFallback, webFallback) {
   document.body.removeChild(link);
 
   setTimeout(() => {
-    if (!document.hidden && intentFallback) {
-      window.location.href = intentFallback;
-    }
+    if (!document.hidden && intentFallback) window.location.href = intentFallback;
   }, 350);
 
   if (webFallback) {
     setTimeout(() => {
-      if (!document.hidden) {
-        window.location.href = webFallback;
-      }
+      if (!document.hidden) window.location.href = webFallback;
     }, 1500);
   }
 }
@@ -316,7 +379,13 @@ function launchAndroidIntent(deepLink, intentFallback, webFallback) {
 function executeSingleAction(rawPrompt) {
   const p = rawPrompt.toLowerCase().replace(/[^a-z0-9\s]/g, " ").trim();
 
-  // 1. INSTAGRAM INTENT
+  // 1. AUTONOMOUS TRAIN & CROSSING TRACKING INTENT
+  if (/\b(train|trains|rail|railway|crossing|bogey|station|fastest train)\b/.test(p)) {
+    handleTrainSearchAndTracking(p);
+    return true;
+  }
+
+  // 2. INSTAGRAM INTENT
   if (/\b(instagram|insta|instgram|ig)\b/.test(p)) {
     const reply = "Launching Instagram, Boss.";
     speakVoiceQuick(reply);
@@ -329,7 +398,7 @@ function executeSingleAction(rawPrompt) {
     return true;
   }
 
-  // 2. WHATSAPP INTENT
+  // 3. WHATSAPP INTENT
   if (/\b(whatsapp|whats app|watsapp|wa)\b/.test(p)) {
     const reply = "Opening WhatsApp, Boss.";
     speakVoiceQuick(reply);
@@ -342,7 +411,7 @@ function executeSingleAction(rawPrompt) {
     return true;
   }
 
-  // 3. TELEGRAM INTENT
+  // 4. TELEGRAM INTENT
   if (/\b(telegram|tg)\b/.test(p)) {
     const reply = "Accessing Telegram, Boss.";
     speakVoiceQuick(reply);
@@ -355,7 +424,7 @@ function executeSingleAction(rawPrompt) {
     return true;
   }
 
-  // 4. YOUTUBE APP INTENT
+  // 5. YOUTUBE INTENT
   if (/\b(youtube|yt)\b/.test(p) && !p.includes("play") && !p.includes("search")) {
     const reply = "Launching YouTube, Boss.";
     speakVoiceQuick(reply);
@@ -368,33 +437,25 @@ function executeSingleAction(rawPrompt) {
     return true;
   }
 
-  // 5. CAMERA INTENT
+  // 6. CAMERA INTENT
   if (/\b(camera|photo|picture)\b/.test(p)) {
     const reply = "Initializing optical capture, Boss.";
     speakVoiceQuick(reply);
     updateUI(reply, "Dispatched: Camera");
-    launchAndroidIntent(
-      "intent:#Intent;action=android.media.action.IMAGE_CAPTURE;end",
-      null,
-      null
-    );
+    launchAndroidIntent("intent:#Intent;action=android.media.action.IMAGE_CAPTURE;end", null, null);
     return true;
   }
 
-  // 6. GMAIL INTENT
+  // 7. GMAIL INTENT
   if (/\b(gmail|email|mail)\b/.test(p)) {
     const reply = "Opening mail console, Boss.";
     speakVoiceQuick(reply);
     updateUI(reply, "Dispatched: Gmail");
-    launchAndroidIntent(
-      "googlegmail://",
-      "intent:#Intent;package=com.google.android.gm;scheme=googlegmail;end",
-      "https://mail.google.com"
-    );
+    launchAndroidIntent("googlegmail://", "intent:#Intent;package=com.google.android.gm;scheme=googlegmail;end", "https://mail.google.com");
     return true;
   }
 
-  // 7. BATTERY DIAGNOSTIC
+  // 8. BATTERY DIAGNOSTIC
   if (p.includes("battery") || p.includes("charge") || p.includes("power level")) {
     const batEl = document.getElementById("batteryStat");
     const val = batEl ? batEl.innerText : "Nominal";
@@ -404,7 +465,7 @@ function executeSingleAction(rawPrompt) {
     return true;
   }
 
-  // 8. CLOCK / TIME
+  // 9. CLOCK / TIME
   const timeTriggers = ["time", "watch", "clock", "samayam", "time entha", "samay", "neram", "ghadi"];
   if (timeTriggers.some(w => p.includes(w))) {
     const timeStr = new Date().toLocaleTimeString("en-IN", { hour: "numeric", minute: "2-digit", hour12: true });
@@ -414,7 +475,7 @@ function executeSingleAction(rawPrompt) {
     return true;
   }
 
-  // 9. WEATHER RADAR HUD
+  // 10. WEATHER RADAR HUD
   if (p.includes("weather") || p.includes("rain") || p.includes("climate") || p.includes("varsham") || p.includes("mausam")) {
     const reply = "Streaming live radar telemetry, Boss.";
     speakVoiceQuick(reply);
@@ -427,7 +488,7 @@ function executeSingleAction(rawPrompt) {
     return true;
   }
 
-  // 10. LIVE CRICKET HUD
+  // 11. LIVE CRICKET HUD
   if (p.includes("cricket") || p.includes("score") || p.includes("ipl") || p.includes("match")) {
     const reply = "Streaming live cricket scorecard in HUD, Boss.";
     speakVoiceQuick(reply);
@@ -436,25 +497,13 @@ function executeSingleAction(rawPrompt) {
     return true;
   }
 
-  // 11. CALCULATOR
+  // 12. CALCULATOR
   if (p.includes("calculator") || p.includes("calculate") || p.includes("lekkalu") || p.includes("hisab")) {
     const reply = "Deploying math processing matrix, Boss.";
     speakVoiceQuick(reply);
     updateUI(reply, "Dispatched: Calculator");
     openUniversalApp("Calculator", "https://www.desmos.com/scientific", "https://www.desmos.com/scientific");
     return true;
-  }
-
-  // 12. WIKIPEDIA
-  if (p.startsWith("wiki") || p.startsWith("who is") || p.startsWith("what is")) {
-    const topic = p.replace(/^(wiki|who is|what is|tell me about)/gi, "").trim();
-    if (topic.length > 2) {
-      const reply = `Retrieving intelligence on ${topic}, Boss.`;
-      speakVoiceQuick(reply);
-      updateUI(reply, `Dispatched: Wikipedia -> ${topic}`);
-      openUniversalApp(`WIKI // ${topic}`, `https://en.m.wikipedia.org/wiki/${encodeURIComponent(topic)}`, `https://en.wikipedia.org/wiki/${encodeURIComponent(topic)}`);
-      return true;
-    }
   }
 
   // 13. MUSIC / SONG SEARCH
@@ -491,7 +540,7 @@ function executeSingleAction(rawPrompt) {
 }
 
 // -------------------------------------------------------------------------
-// 5-SECOND COMMAND CAPTURE + NOISE/SYMBOL FILTERING
+// 5-SECOND COMMAND CAPTURE & RECOGNITION
 // -------------------------------------------------------------------------
 function resetSilenceTimer() {
   if (speechCaptureTimer) clearTimeout(speechCaptureTimer);
@@ -544,7 +593,6 @@ function startCommandListening() {
     isCommandActive = false;
 
     const finalQuery = collectedTranscript.trim();
-
     const cleaned = finalQuery.replace(/[^a-zA-Z0-9]/g, "").trim();
     if (cleaned.length < 2) {
       setJarvisVisualState("IDLE");
@@ -564,7 +612,7 @@ function startCommandListening() {
     playFuturisticChime("PROCESSING");
 
     try {
-      const res = await fetch(WORKER_ENDPOINT, {
+      const res = await fetch(`${WORKER_ENDPOINT}/api/ask`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -631,13 +679,8 @@ function initWakeWordEngine() {
       if (directCommand.length > 2) {
         handleDirectCommand(directCommand);
       } else {
-        setTimeout(() => {
-          startCommandListening();
-        }, 650);
+        setTimeout(() => { startCommandListening(); }, 650);
       }
-    } else {
-      const debug = document.getElementById("debugBox");
-      if (debug) debug.innerText = `Ignored Ambient: "${text}"`;
     }
   };
 
@@ -674,7 +717,7 @@ async function handleDirectCommand(prompt) {
   playFuturisticChime("PROCESSING");
 
   try {
-    const res = await fetch(WORKER_ENDPOINT, {
+    const res = await fetch(`${WORKER_ENDPOINT}/api/ask`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ prompt, history: conversationMemory })

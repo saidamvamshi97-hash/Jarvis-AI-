@@ -1,5 +1,5 @@
 // =========================================================================
-// J.A.R.V.I.S. MK-VII: CONTEXT MEMORY + AMBIENT TELEMETRY + 5S AUTO-CUT
+// J.A.R.V.I.S. MK-VII: MALE ROBOTIC VOICE + PERSISTENT WAKE + 5S AUTO-CUT
 // =========================================================================
 
 const WORKER_ENDPOINT = "https://jarvis-automation.saidamvamshi97.workers.dev/api/ask";
@@ -18,7 +18,11 @@ let speechCaptureTimer = null;
 let collectedTranscript = "";
 
 let audioCtx = null;
+let availableVoices = [];
 
+// -------------------------------------------------------------------------
+// AUDIO ENGINE & VOICE INITIALIZATION
+// -------------------------------------------------------------------------
 function initAudioEngine() {
   if (!audioCtx) {
     audioCtx = new (window.AudioContext || window.webkitAudioContext)();
@@ -28,7 +32,77 @@ function initAudioEngine() {
 window.addEventListener("touchstart", initAudioEngine, { once: true });
 window.addEventListener("click", initAudioEngine, { once: true });
 
-// Live Ambient Device Telemetry (Battery & Connectivity)
+function loadSystemVoices() {
+  if ("speechSynthesis" in window) {
+    availableVoices = window.speechSynthesis.getVoices();
+  }
+}
+
+if ("speechSynthesis" in window) {
+  loadSystemVoices();
+  window.speechSynthesis.onvoiceschanged = loadSystemVoices;
+}
+
+// -------------------------------------------------------------------------
+// MALE ROBOTIC VOICE ENGINE (DEEP BARITONE / STARK CADENCE)
+// -------------------------------------------------------------------------
+function selectRoboticMaleVoice(langCode) {
+  if (!availableVoices.length) loadSystemVoices();
+
+  const maleKeywords = ["male", "guy", "david", "george", "oliver", "rishi", "google uk english male"];
+
+  // 1. Language matching first
+  const langVoices = availableVoices.filter(v => v.lang.toLowerCase().startsWith(langCode.slice(0, 2)));
+
+  // 2. Search for explicit male voices in target language
+  const maleMatch = langVoices.find(v => 
+    maleKeywords.some(kw => v.name.toLowerCase().includes(kw))
+  );
+  if (maleMatch) return maleMatch;
+
+  // 3. Fallback: Search globally for UK English male or US English male
+  const globalMale = availableVoices.find(v => 
+    (v.lang.includes("en-GB") || v.lang.includes("en-US") || v.lang.includes("en-IN")) &&
+    maleKeywords.some(kw => v.name.toLowerCase().includes(kw))
+  );
+  if (globalMale) return globalMale;
+
+  return langVoices[0] || availableVoices[0] || null;
+}
+
+function speakVoiceQuick(text) {
+  if (!("speechSynthesis" in window)) return;
+  window.speechSynthesis.cancel();
+
+  const utterance = new SpeechSynthesisUtterance(text);
+
+  let targetLang = "en-GB"; // UK English gives the signature Stark J.A.R.V.I.S accent
+  if (/[\u0C00-\u0C7F]/.test(text)) {
+    targetLang = "te-IN";
+  } else if (/[\u0900-\u097F]/.test(text)) {
+    targetLang = "hi-IN";
+  } else if (/[\u0B80-\u0BFF]/.test(text)) {
+    targetLang = "ta-IN";
+  }
+
+  utterance.lang = targetLang;
+
+  const maleVoice = selectRoboticMaleVoice(targetLang);
+  if (maleVoice) {
+    utterance.voice = maleVoice;
+  }
+
+  // Pitch lowered to 0.78 creates the deep robotic resonance
+  utterance.pitch = 0.78;
+  utterance.rate = 1.05;
+  utterance.volume = 1.0;
+
+  window.speechSynthesis.speak(utterance);
+}
+
+// -------------------------------------------------------------------------
+// LIVE TELEMETRY & SOUND EFFECTS
+// -------------------------------------------------------------------------
 async function updateAmbientTelemetry() {
   const batEl = document.getElementById("batteryStat");
   const netEl = document.getElementById("networkStat");
@@ -57,7 +131,6 @@ async function updateAmbientTelemetry() {
 }
 document.addEventListener("DOMContentLoaded", updateAmbientTelemetry);
 
-// Synthesized Sound Effects
 function playFuturisticChime(type) {
   try {
     initAudioEngine();
@@ -178,10 +251,9 @@ function closeUniversalApp() {
 }
 
 // -------------------------------------------------------------------------
-// HARDWARE & AUTONOMOUS ACTION DISPATCHER
+// LOCAL COMMAND ENGINE
 // -------------------------------------------------------------------------
 function executeSingleAction(p) {
-  // Device Battery Telemetry Query
   if (p.includes("battery") || p.includes("charge") || p.includes("power level")) {
     const batEl = document.getElementById("batteryStat");
     const val = batEl ? batEl.innerText : "Nominal";
@@ -191,7 +263,6 @@ function executeSingleAction(p) {
     return true;
   }
 
-  // Time Query
   const timeTriggers = ["time", "watch", "clock", "samayam", "time entha", "samay", "neram", "ghadi"];
   if (timeTriggers.some(w => p.includes(w))) {
     const timeStr = new Date().toLocaleTimeString("en-IN", { hour: "numeric", minute: "2-digit", hour12: true });
@@ -201,7 +272,6 @@ function executeSingleAction(p) {
     return true;
   }
 
-  // Weather Radar
   if (p.includes("weather") || p.includes("rain") || p.includes("climate") || p.includes("varsham") || p.includes("mausam")) {
     const reply = "Streaming live radar telemetry, Boss.";
     speakVoiceQuick(reply);
@@ -214,7 +284,6 @@ function executeSingleAction(p) {
     return true;
   }
 
-  // Cricket Scores
   if (p.includes("cricket") || p.includes("score") || p.includes("ipl") || p.includes("match")) {
     const reply = "Streaming live cricket scorecard in HUD, Boss.";
     speakVoiceQuick(reply);
@@ -223,7 +292,6 @@ function executeSingleAction(p) {
     return true;
   }
 
-  // Calculator
   if (p.includes("calculator") || p.includes("calculate") || p.includes("lekkalu") || p.includes("hisab")) {
     const reply = "Deploying math processing matrix, Boss.";
     speakVoiceQuick(reply);
@@ -232,7 +300,6 @@ function executeSingleAction(p) {
     return true;
   }
 
-  // Wikipedia
   if (p.startsWith("wiki") || p.startsWith("who is") || p.startsWith("what is")) {
     const topic = p.replace(/^(wiki|who is|what is|tell me about)/gi, "").trim();
     if (topic.length > 2) {
@@ -244,7 +311,6 @@ function executeSingleAction(p) {
     }
   }
 
-  // YouTube / Spotify Intent
   const musicTriggers = ["play", "paly", "ply", "song", "songs", "paata", "paatalu", "music", "youtube", "spotify"];
   if (musicTriggers.some(w => p.includes(w))) {
     let cleanQuery = p
@@ -339,7 +405,6 @@ function startCommandListening() {
       return;
     }
 
-    // Check fast local actions
     const handled = executeSingleAction(finalQuery.toLowerCase());
     if (handled) {
       setJarvisVisualState("IDLE");
@@ -347,7 +412,6 @@ function startCommandListening() {
       return;
     }
 
-    // Dispatch to Cloud Brain with Neural Memory
     setJarvisVisualState("THINKING");
     playFuturisticChime("PROCESSING");
 
@@ -364,7 +428,6 @@ function startCommandListening() {
       const data = await res.json();
       const reply = data.reply || "Done, Boss.";
 
-      // Update conversational memory
       conversationMemory.push({ role: "user", content: finalQuery });
       conversationMemory.push({ role: "assistant", content: reply });
       if (conversationMemory.length > 10) conversationMemory.splice(0, 2);
@@ -388,21 +451,6 @@ function resumeWakeEngine() {
       try { wakeRecognition.start(); } catch (e) {}
     }, 400);
   }
-}
-
-function speakVoiceQuick(text) {
-  if (!("speechSynthesis" in window)) return;
-  window.speechSynthesis.cancel();
-  const utterance = new SpeechSynthesisUtterance(text);
-
-  if (/[\u0C00-\u0C7F]/.test(text)) utterance.lang = "te-IN";
-  else if (/[\u0900-\u097F]/.test(text)) utterance.lang = "hi-IN";
-  else if (/[\u0B80-\u0BFF]/.test(text)) utterance.lang = "ta-IN";
-  else utterance.lang = "en-IN";
-
-  utterance.rate = 1.15;
-  utterance.pitch = 1.0;
-  window.speechSynthesis.speak(utterance);
 }
 
 // -------------------------------------------------------------------------
@@ -486,7 +534,9 @@ async function toggleWakeWord() {
   }
 }
 
-// Siri Button Push-to-Talk setup
+// -------------------------------------------------------------------------
+// SIRI BUTTON CONTROLLER
+// -------------------------------------------------------------------------
 function setupSiriButton() {
   const btn = document.getElementById("siriSpeakBtn");
   if (!btn) return;
@@ -500,4 +550,5 @@ function setupSiriButton() {
     startCommandListening();
   });
 }
+
 document.addEventListener("DOMContentLoaded", setupSiriButton);

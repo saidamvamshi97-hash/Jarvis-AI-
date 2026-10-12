@@ -1,6 +1,5 @@
 // =========================================================================
-// J.A.R.V.I.S. INTERACTIVE RUNTIME: SYNCHRONIZED SIRI ORB + 5S AUTO-CUT TIMER
-// (EXCLUSIVE ANDROID SPEECH RECOGNITION PIPELINE - NO MIC HARDWARE CONFLICT)
+// J.A.R.V.I.S. MK-VII: CONTEXT MEMORY + AMBIENT TELEMETRY + 5S AUTO-CUT
 // =========================================================================
 
 const WORKER_ENDPOINT = "https://jarvis-automation.saidamvamshi97.workers.dev/api/ask";
@@ -11,25 +10,54 @@ let commandRecognition = null;
 let isWakeActive = false;
 let isCommandActive = false;
 
-// 5-Second Silence Auto-Cut Timer & Transcript Buffer
+// Multi-turn conversational memory cache (retains last 6 interactions)
+let conversationMemory = [];
+
+// 5-Second Silence Detection
 let speechCaptureTimer = null;
 let collectedTranscript = "";
 
-// Web Audio Synthesizer Context
 let audioCtx = null;
 
 function initAudioEngine() {
   if (!audioCtx) {
     audioCtx = new (window.AudioContext || window.webkitAudioContext)();
   }
-  if (audioCtx.state === "suspended") {
-    audioCtx.resume();
-  }
+  if (audioCtx.state === "suspended") audioCtx.resume();
 }
 window.addEventListener("touchstart", initAudioEngine, { once: true });
 window.addEventListener("click", initAudioEngine, { once: true });
 
-// Synthesized Tone Generator (Web Audio API)
+// Live Ambient Device Telemetry (Battery & Connectivity)
+async function updateAmbientTelemetry() {
+  const batEl = document.getElementById("batteryStat");
+  const netEl = document.getElementById("networkStat");
+
+  if (navigator.getBattery && batEl) {
+    try {
+      const bat = await navigator.getBattery();
+      const setLevel = () => {
+        batEl.innerText = `${Math.round(bat.level * 100)}%${bat.charging ? " ⚡" : ""}`;
+      };
+      setLevel();
+      bat.addEventListener("levelchange", setLevel);
+      bat.addEventListener("chargingchange", setLevel);
+    } catch (e) {}
+  }
+
+  if (netEl) {
+    const updateNet = () => {
+      netEl.innerText = navigator.onLine ? "ONLINE" : "OFFLINE";
+      netEl.style.color = navigator.onLine ? "#00ffff" : "#ff0055";
+    };
+    updateNet();
+    window.addEventListener("online", updateNet);
+    window.addEventListener("offline", updateNet);
+  }
+}
+document.addEventListener("DOMContentLoaded", updateAmbientTelemetry);
+
+// Synthesized Sound Effects
 function playFuturisticChime(type) {
   try {
     initAudioEngine();
@@ -72,14 +100,10 @@ function playFuturisticChime(type) {
 
 function triggerHaptic(type) {
   if (!("vibrate" in navigator)) return;
-  if (type === "WAKE") {
-    navigator.vibrate([40, 60, 50]);
-  } else if (type === "OFF") {
-    navigator.vibrate(30);
-  }
+  if (type === "WAKE") navigator.vibrate([40, 60, 50]);
+  else if (type === "OFF") navigator.vibrate(30);
 }
 
-// Visual State Controller (Arc Reactor + Siri Button Wrapper)
 function setJarvisVisualState(state) {
   const orb = document.querySelector(".orb-inner");
   const ring = document.querySelector(".orb-ring");
@@ -124,7 +148,7 @@ function updateUI(mainText, debugText) {
 }
 
 // -------------------------------------------------------------------------
-// UNIVERSAL FLOATING HUD ENGINE
+// HUD MODAL CONTROLLER
 // -------------------------------------------------------------------------
 function openUniversalApp(appName, embedUrl, deepLinkUrl) {
   const modal = document.getElementById("universalAppModal");
@@ -154,18 +178,20 @@ function closeUniversalApp() {
 }
 
 // -------------------------------------------------------------------------
-// MULTI-INTENT SEQUENTIAL COMMAND RUNNER
+// HARDWARE & AUTONOMOUS ACTION DISPATCHER
 // -------------------------------------------------------------------------
-function splitMultiCommands(prompt) {
-  const delimiterRegex = /\b(and then|and also|then|and|mariyu|inka|aur|phir)\b|,/gi;
-  return prompt
-    .split(delimiterRegex)
-    .map(cmd => cmd.trim())
-    .filter(cmd => cmd.length > 2 && !cmd.match(/^(and|then|also|mariyu|inka|aur|phir)$/i));
-}
-
 function executeSingleAction(p) {
-  // 1. Time / Clock
+  // Device Battery Telemetry Query
+  if (p.includes("battery") || p.includes("charge") || p.includes("power level")) {
+    const batEl = document.getElementById("batteryStat");
+    const val = batEl ? batEl.innerText : "Nominal";
+    const reply = `Power reserves are at ${val}, Boss. All systems green.`;
+    speakVoiceQuick(reply);
+    updateUI(reply, "Action: Battery Diagnostic");
+    return true;
+  }
+
+  // Time Query
   const timeTriggers = ["time", "watch", "clock", "samayam", "time entha", "samay", "neram", "ghadi"];
   if (timeTriggers.some(w => p.includes(w))) {
     const timeStr = new Date().toLocaleTimeString("en-IN", { hour: "numeric", minute: "2-digit", hour12: true });
@@ -175,9 +201,9 @@ function executeSingleAction(p) {
     return true;
   }
 
-  // 2. Weather Radar
+  // Weather Radar
   if (p.includes("weather") || p.includes("rain") || p.includes("climate") || p.includes("varsham") || p.includes("mausam")) {
-    const reply = "Loading atmospheric weather radar, Boss.";
+    const reply = "Streaming live radar telemetry, Boss.";
     speakVoiceQuick(reply);
     updateUI(reply, "Dispatched: Weather Radar");
     openUniversalApp(
@@ -188,7 +214,7 @@ function executeSingleAction(p) {
     return true;
   }
 
-  // 3. Cricket Scores
+  // Cricket Scores
   if (p.includes("cricket") || p.includes("score") || p.includes("ipl") || p.includes("match")) {
     const reply = "Streaming live cricket scorecard in HUD, Boss.";
     speakVoiceQuick(reply);
@@ -197,53 +223,41 @@ function executeSingleAction(p) {
     return true;
   }
 
-  // 4. Calculator
+  // Calculator
   if (p.includes("calculator") || p.includes("calculate") || p.includes("lekkalu") || p.includes("hisab")) {
-    const reply = "Opening calculation core, Boss.";
+    const reply = "Deploying math processing matrix, Boss.";
     speakVoiceQuick(reply);
     updateUI(reply, "Dispatched: Calculator");
     openUniversalApp("Calculator", "https://www.desmos.com/scientific", "https://www.desmos.com/scientific");
     return true;
   }
 
-  // 5. Wikipedia
+  // Wikipedia
   if (p.startsWith("wiki") || p.startsWith("who is") || p.startsWith("what is")) {
     const topic = p.replace(/^(wiki|who is|what is|tell me about)/gi, "").trim();
     if (topic.length > 2) {
       const reply = `Retrieving intelligence on ${topic}, Boss.`;
       speakVoiceQuick(reply);
       updateUI(reply, `Dispatched: Wikipedia -> ${topic}`);
-      openUniversalApp(
-        `WIKI // ${topic}`,
-        `https://en.m.wikipedia.org/wiki/${encodeURIComponent(topic)}`,
-        `https://en.wikipedia.org/wiki/${encodeURIComponent(topic)}`
-      );
+      openUniversalApp(`WIKI // ${topic}`, `https://en.m.wikipedia.org/wiki/${encodeURIComponent(topic)}`, `https://en.wikipedia.org/wiki/${encodeURIComponent(topic)}`);
       return true;
     }
   }
 
-  // 6. Music & YouTube Intent
-  const musicTriggers = [
-    "play", "paly", "ply", "song", "songs", "paata", "paatalu", "music", "youtube", "spotify",
-    "chiranjeevi", "prabhas", "pawan", "kalyan", "rebel", "salaar", "dsp", "anirudh"
-  ];
+  // YouTube / Spotify Intent
+  const musicTriggers = ["play", "paly", "ply", "song", "songs", "paata", "paatalu", "music", "youtube", "spotify"];
   if (musicTriggers.some(w => p.includes(w))) {
     let cleanQuery = p
       .replace(/when\s+(i\s+have\s+to|do\s+i|should\s+i)/gi, "")
-      .replace(/how\s+(to|do\s+i)/gi, "")
       .replace(/^(hey jarvis|jarvis|please|bhayya|mama|bro|can you)/gi, "")
       .replace(/\b(play|paly|ply|start|listen to|watch|open|choodu|vinu|pettu|lagao|chalao)\b/gi, "")
       .replace(/\b(on youtube|in youtube|youtube|on spotify|spotify|lo|la)\b/gi, "")
       .trim();
 
-    if (!cleanQuery || ["song", "songs", "paata", "paatalu"].includes(cleanQuery)) {
-      if (p.includes("chiranjeevi")) cleanQuery = "Chiranjeevi hit songs";
-      else if (p.includes("prabhas")) cleanQuery = "Prabhas hit songs";
-      else cleanQuery = "Telugu latest hit songs";
-    }
+    if (!cleanQuery) cleanQuery = "Telugu latest hit songs";
 
     if (p.includes("spotify")) {
-      const reply = `Streaming ${cleanQuery} on Spotify HUD, Boss.`;
+      const reply = `Streaming ${cleanQuery} on Spotify, Boss.`;
       speakVoiceQuick(reply);
       updateUI(reply, `Dispatched: Spotify -> "${cleanQuery}"`);
       openUniversalApp(`Spotify // ${cleanQuery}`, `https://open.spotify.com/embed/search/${encodeURIComponent(cleanQuery)}`, `spotify:search:${encodeURIComponent(cleanQuery)}`);
@@ -256,59 +270,22 @@ function executeSingleAction(p) {
         const fallback = `https://www.youtube.com/results?search_query=${encodeURIComponent(cleanQuery)}`;
         const opened = window.open(intent, "_blank");
         if (!opened) window.location.href = fallback;
-      }, 600);
+      }, 500);
     }
-    return true;
-  }
-
-  // 7. Navigation
-  const navTriggers = ["navigate", "route", "direction", "map", "raasta", "margam", "vellu"];
-  if (navTriggers.some(w => p.includes(w))) {
-    let dest = p.replace(/.*(?:navigate to|route to|map to|go to|vellu)/gi, "").replace(/^(hey jarvis|jarvis)/gi, "").trim();
-    if (!dest) dest = "Wanaparthy";
-
-    const reply = `Plotting route to ${dest}, Boss.`;
-    speakVoiceQuick(reply);
-    updateUI(reply, `Dispatched Navigation: "${dest}"`);
-    openUniversalApp(`Route: ${dest}`, `https://maps.google.com/maps?q=${encodeURIComponent(dest)}&t=&z=13&ie=UTF8&iwloc=&output=embed`, `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(dest)}`);
     return true;
   }
 
   return false;
 }
 
-async function interceptLocalAction(rawPrompt) {
-  const commands = splitMultiCommands(rawPrompt);
-  if (commands.length <= 1) {
-    return executeSingleAction(rawPrompt.toLowerCase());
-  }
-
-  updateUI(`Executing ${commands.length} tasks...`, `Chained Intent: ${commands.join(" -> ")}`);
-  let executedAny = false;
-
-  for (let i = 0; i < commands.length; i++) {
-    const cmd = commands[i].toLowerCase();
-    const handled = executeSingleAction(cmd);
-    if (handled) executedAny = true;
-    if (i < commands.length - 1) {
-      await new Promise(res => setTimeout(res, 1200));
-    }
-  }
-  return executedAny;
-}
-
 // -------------------------------------------------------------------------
-// 5-SECOND DYNAMIC COMMAND LISTENER
+// 5-SECOND COMMAND CAPTURE + NEURAL CLOUD DISPATCH
 // -------------------------------------------------------------------------
 function resetSilenceTimer() {
   if (speechCaptureTimer) clearTimeout(speechCaptureTimer);
-
-  // Auto-stops recognition after 5 seconds of silence
   speechCaptureTimer = setTimeout(() => {
     if (isCommandActive && commandRecognition) {
-      try {
-        commandRecognition.stop();
-      } catch (err) {}
+      try { commandRecognition.stop(); } catch (err) {}
     }
   }, 5000);
 }
@@ -333,8 +310,7 @@ function startCommandListening() {
   resetSilenceTimer();
 
   commandRecognition.onresult = (event) => {
-    resetSilenceTimer(); // Reset 5s countdown every time a word is spoken
-
+    resetSilenceTimer();
     let interim = "";
     for (let i = event.resultIndex; i < event.results.length; ++i) {
       if (event.results[i].isFinal) {
@@ -343,17 +319,12 @@ function startCommandListening() {
         interim += event.results[i][0].transcript;
       }
     }
-
-    const currentText = (collectedTranscript + " " + interim).trim();
-    if (currentText) {
-      updateUI(`"${currentText}"`, "Recording speech...");
-    }
+    const current = (collectedTranscript + " " + interim).trim();
+    if (current) updateUI(`"${current}"`, "Recording speech...");
   };
 
   commandRecognition.onerror = (e) => {
-    if (e.error !== "no-speech") {
-      updateUI("Listening interrupted.", `Mic Status: ${e.error}`);
-    }
+    if (e.error !== "no-speech") updateUI("Interrupted", `Status: ${e.error}`);
   };
 
   commandRecognition.onend = async () => {
@@ -361,7 +332,6 @@ function startCommandListening() {
     isCommandActive = false;
 
     const finalQuery = collectedTranscript.trim();
-
     if (!finalQuery) {
       setJarvisVisualState("IDLE");
       updateUI("Ready for command, Boss.", "No voice detected.");
@@ -369,15 +339,15 @@ function startCommandListening() {
       return;
     }
 
-    updateUI(`"${finalQuery}"`, "Processing query...");
-
-    const wasHandled = await interceptLocalAction(finalQuery);
-    if (wasHandled) {
+    // Check fast local actions
+    const handled = executeSingleAction(finalQuery.toLowerCase());
+    if (handled) {
       setJarvisVisualState("IDLE");
       resumeWakeEngine();
       return;
     }
 
+    // Dispatch to Cloud Brain with Neural Memory
     setJarvisVisualState("THINKING");
     playFuturisticChime("PROCESSING");
 
@@ -385,14 +355,24 @@ function startCommandListening() {
       const res = await fetch(WORKER_ENDPOINT, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ prompt: finalQuery })
+        body: JSON.stringify({
+          prompt: finalQuery,
+          history: conversationMemory
+        })
       });
+
       const data = await res.json();
       const reply = data.reply || "Done, Boss.";
+
+      // Update conversational memory
+      conversationMemory.push({ role: "user", content: finalQuery });
+      conversationMemory.push({ role: "assistant", content: reply });
+      if (conversationMemory.length > 10) conversationMemory.splice(0, 2);
+
       updateUI(reply, "Cloud AI Answered");
       speakVoiceQuick(reply);
     } catch (err) {
-      updateUI("Systems link timeout, Boss.", `Error: ${err.message}`);
+      updateUI("Telemetry timeout, Boss.", `Error: ${err.message}`);
     }
 
     setJarvisVisualState("IDLE");
@@ -414,16 +394,11 @@ function speakVoiceQuick(text) {
   if (!("speechSynthesis" in window)) return;
   window.speechSynthesis.cancel();
   const utterance = new SpeechSynthesisUtterance(text);
-  
-  if (/[\u0C00-\u0C7F]/.test(text)) {
-    utterance.lang = "te-IN";
-  } else if (/[\u0900-\u097F]/.test(text)) {
-    utterance.lang = "hi-IN";
-  } else if (/[\u0B80-\u0BFF]/.test(text)) {
-    utterance.lang = "ta-IN";
-  } else {
-    utterance.lang = "en-IN";
-  }
+
+  if (/[\u0C00-\u0C7F]/.test(text)) utterance.lang = "te-IN";
+  else if (/[\u0900-\u097F]/.test(text)) utterance.lang = "hi-IN";
+  else if (/[\u0B80-\u0BFF]/.test(text)) utterance.lang = "ta-IN";
+  else utterance.lang = "en-IN";
 
   utterance.rate = 1.15;
   utterance.pitch = 1.0;
@@ -431,7 +406,7 @@ function speakVoiceQuick(text) {
 }
 
 // -------------------------------------------------------------------------
-// PERSISTENT 24/7 WAKE WORD ENGINE ("Hey Jarvis")
+// PERSISTENT WAKE ENGINE ("Hey Jarvis")
 // -------------------------------------------------------------------------
 function initWakeWordEngine() {
   if (!SpeechRecognition) return;
@@ -442,10 +417,8 @@ function initWakeWordEngine() {
   wakeRecognition.lang = "en-IN";
 
   wakeRecognition.onresult = (event) => {
-    const result = event.results[event.resultIndex];
-    const text = result[0].transcript.trim().toLowerCase();
-    const confidence = result[0].confidence;
-
+    const text = event.results[event.resultIndex][0].transcript.trim().toLowerCase();
+    const confidence = event.results[event.resultIndex][0].confidence;
     if (confidence && confidence < 0.60) return;
 
     const wakeRegex = /\b(hey jarvis|jarvis|hai jarvis|ok jarvis|hi jarvis)\b/i;
@@ -457,15 +430,10 @@ function initWakeWordEngine() {
 
       updateUI("Yes Boss?", "Wake Word Authenticated");
       speakVoiceQuick("Yes Boss?");
-      
-      const directCommand = text.replace(wakeRegex, "").trim();
-      if (directCommand.length > 2) {
-        handleDirectCommand(directCommand);
-      } else {
-        setTimeout(() => {
-          startCommandListening();
-        }, 600);
-      }
+
+      setTimeout(() => {
+        startCommandListening();
+      }, 650);
     } else {
       const debug = document.getElementById("debugBox");
       if (debug) debug.innerText = `Ignored Ambient: "${text}"`;
@@ -483,37 +451,6 @@ function initWakeWordEngine() {
       }, 250);
     }
   };
-}
-
-async function handleDirectCommand(prompt) {
-  updateUI(`"${prompt}"`, `Direct Prompt: "${prompt}"`);
-  
-  const wasHandled = await interceptLocalAction(prompt);
-  if (wasHandled) {
-    setJarvisVisualState("IDLE");
-    resumeWakeEngine();
-    return;
-  }
-
-  setJarvisVisualState("THINKING");
-  playFuturisticChime("PROCESSING");
-
-  try {
-    const res = await fetch(WORKER_ENDPOINT, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ prompt })
-    });
-    const data = await res.json();
-    const reply = data.reply || "Done, Boss.";
-    updateUI(reply, "Cloud AI Answered");
-    speakVoiceQuick(reply);
-  } catch (err) {
-    updateUI("Systems link timeout, Boss.", `Error: ${err.message}`);
-  }
-
-  setJarvisVisualState("IDLE");
-  resumeWakeEngine();
 }
 
 async function toggleWakeWord() {
@@ -534,9 +471,7 @@ async function toggleWakeWord() {
       if (txt) txt.innerText = "Wake Mode: ON";
       if (orb) orb.classList.add("wake-active");
       updateUI("Wake Mode Active", "Say 'Hey Jarvis' at any time...");
-    } catch (err) {
-      console.warn("Wake init error:", err);
-    }
+    } catch (err) {}
   } else {
     isWakeActive = false;
     try { wakeRecognition.stop(); } catch (e) {}
@@ -551,59 +486,18 @@ async function toggleWakeWord() {
   }
 }
 
-// -------------------------------------------------------------------------
-// SIRI BUTTON PUSH-TO-TALK & TAP CONTROLLER
-// -------------------------------------------------------------------------
-let pressTimer = null;
-let isHoldingButton = false;
-let touchStartTime = 0;
-
+// Siri Button Push-to-Talk setup
 function setupSiriButton() {
   const btn = document.getElementById("siriSpeakBtn");
-  const wrapper = document.querySelector(".siri-button-wrapper");
-  if (!btn || !wrapper) return;
+  if (!btn) return;
 
-  const handlePointerDown = (e) => {
+  btn.addEventListener("pointerdown", (e) => {
     e.preventDefault();
-    touchStartTime = Date.now();
-    isHoldingButton = false;
-
-    if ("speechSynthesis" in window) {
-      window.speechSynthesis.cancel();
-    }
-
+    if ("speechSynthesis" in window) window.speechSynthesis.cancel();
     playFuturisticChime("WAKE");
     if ("vibrate" in navigator) navigator.vibrate(35);
-
     setJarvisVisualState("LISTENING");
-
-    pressTimer = setTimeout(() => {
-      isHoldingButton = true;
-    }, 350);
-
     startCommandListening();
-  };
-
-  const handlePointerUp = (e) => {
-    e.preventDefault();
-    clearTimeout(pressTimer);
-    const pressDuration = Date.now() - touchStartTime;
-
-    if (pressDuration > 350 || isHoldingButton) {
-      if (commandRecognition && isCommandActive) {
-        try {
-          commandRecognition.stop();
-        } catch (err) {}
-      }
-      if ("vibrate" in navigator) navigator.vibrate(20);
-    } else {
-      updateUI("Listening...", "Siri Mode: Tap active, speak request...");
-    }
-  };
-
-  btn.addEventListener("pointerdown", handlePointerDown);
-  btn.addEventListener("pointerup", handlePointerUp);
-  btn.addEventListener("pointercancel", handlePointerUp);
+  });
 }
-
 document.addEventListener("DOMContentLoaded", setupSiriButton);

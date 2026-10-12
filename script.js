@@ -1,5 +1,5 @@
 // =========================================================================
-// J.A.R.V.I.S. MK-VII RUNTIME: FULL CODE (INTENT LAUNCHER + NOISE FILTER + VOICE)
+// J.A.R.V.I.S. MK-VII RUNTIME: FULL SCRIPT (INTENTS + VOICE + WAKE + HUD)
 // =========================================================================
 
 const WORKER_ENDPOINT = "https://jarvis-automation.saidamvamshi97.workers.dev/api/ask";
@@ -247,31 +247,41 @@ function closeUniversalApp() {
 // -------------------------------------------------------------------------
 // ANDROID NATIVE INTENT DISPATCHER
 // -------------------------------------------------------------------------
-function launchAndroidIntent(intentUrl, fallbackWebUrl) {
+function launchAndroidIntent(deepLink, intentFallback, webFallback) {
   const link = document.createElement("a");
-  link.href = intentUrl;
-  link.rel = "noreferrer";
+  link.href = deepLink;
+  link.target = "_blank";
+  link.rel = "noopener noreferrer";
   document.body.appendChild(link);
   link.click();
   document.body.removeChild(link);
 
-  if (fallbackWebUrl) {
+  setTimeout(() => {
+    if (!document.hidden && intentFallback) {
+      window.location.href = intentFallback;
+    }
+  }, 350);
+
+  if (webFallback) {
     setTimeout(() => {
       if (!document.hidden) {
-        window.location.href = fallbackWebUrl;
+        window.location.href = webFallback;
       }
     }, 1500);
   }
 }
 
-function executeSingleAction(p) {
+function executeSingleAction(rawPrompt) {
+  // Normalize prompt: lowercase and strip out symbols/punctuation
+  const p = rawPrompt.toLowerCase().replace(/[^a-z0-9\s]/g, " ").trim();
+
   // 1. INSTAGRAM INTENT
-  const instaKeywords = ["instagram", "insta", "instgram", "istagram", "gram", "ig"];
-  if (instaKeywords.some(k => p.includes(k))) {
+  if (/\b(instagram|insta|instgram|ig)\b/.test(p)) {
     const reply = "Launching Instagram, Boss.";
     speakVoiceQuick(reply);
     updateUI(reply, "Dispatched: Instagram");
     launchAndroidIntent(
+      "instagram://app",
       "intent://instagram.com/#Intent;package=com.instagram.android;scheme=https;end",
       "https://www.instagram.com"
     );
@@ -279,12 +289,12 @@ function executeSingleAction(p) {
   }
 
   // 2. WHATSAPP INTENT
-  const waKeywords = ["whatsapp", "whats app", "watshap", "watsap"];
-  if (waKeywords.some(k => p.includes(k))) {
+  if (/\b(whatsapp|whats app|watsapp|wa)\b/.test(p)) {
     const reply = "Opening WhatsApp, Boss.";
     speakVoiceQuick(reply);
     updateUI(reply, "Dispatched: WhatsApp");
     launchAndroidIntent(
+      "whatsapp://send",
       "intent://send#Intent;package=com.whatsapp;scheme=whatsapp;end",
       "https://web.whatsapp.com"
     );
@@ -292,41 +302,58 @@ function executeSingleAction(p) {
   }
 
   // 3. TELEGRAM INTENT
-  if (p.includes("telegram")) {
-    const reply = "Accessing Telegram comms, Boss.";
+  if (/\b(telegram|tg)\b/.test(p)) {
+    const reply = "Accessing Telegram, Boss.";
     speakVoiceQuick(reply);
     updateUI(reply, "Dispatched: Telegram");
     launchAndroidIntent(
+      "tg://openmessage",
       "intent:#Intent;package=org.telegram.messenger;scheme=tg;end",
       "https://web.telegram.org"
     );
     return true;
   }
 
-  // 4. CAMERA
-  if (p.includes("camera") || p.includes("photo") || p.includes("take a picture")) {
-    const reply = "Initializing optical sensors, Boss.";
+  // 4. YOUTUBE APP INTENT (Direct launch)
+  if (/\b(youtube|yt)\b/.test(p) && !p.includes("play") && !p.includes("search")) {
+    const reply = "Launching YouTube, Boss.";
     speakVoiceQuick(reply);
-    updateUI(reply, "Dispatched: Camera");
+    updateUI(reply, "Dispatched: YouTube");
     launchAndroidIntent(
-      "intent:#Intent;action=android.media.action.IMAGE_CAPTURE;end"
+      "vnd.youtube://",
+      "intent://www.youtube.com/#Intent;package=com.google.android.youtube;scheme=https;end",
+      "https://www.youtube.com"
     );
     return true;
   }
 
-  // 5. GMAIL
-  if (p.includes("gmail") || p.includes("email") || p.includes("mail")) {
-    const reply = "Opening incoming mail relays, Boss.";
+  // 5. CAMERA INTENT
+  if (/\b(camera|photo|picture)\b/.test(p)) {
+    const reply = "Initializing optical capture, Boss.";
+    speakVoiceQuick(reply);
+    updateUI(reply, "Dispatched: Camera");
+    launchAndroidIntent(
+      "intent:#Intent;action=android.media.action.IMAGE_CAPTURE;end",
+      null,
+      null
+    );
+    return true;
+  }
+
+  // 6. GMAIL INTENT
+  if (/\b(gmail|email|mail)\b/.test(p)) {
+    const reply = "Opening mail console, Boss.";
     speakVoiceQuick(reply);
     updateUI(reply, "Dispatched: Gmail");
     launchAndroidIntent(
+      "googlegmail://",
       "intent:#Intent;package=com.google.android.gm;scheme=googlegmail;end",
       "https://mail.google.com"
     );
     return true;
   }
 
-  // 6. BATTERY DIAGNOSTIC
+  // 7. BATTERY DIAGNOSTIC
   if (p.includes("battery") || p.includes("charge") || p.includes("power level")) {
     const batEl = document.getElementById("batteryStat");
     const val = batEl ? batEl.innerText : "Nominal";
@@ -336,7 +363,7 @@ function executeSingleAction(p) {
     return true;
   }
 
-  // 7. CLOCK / TIME
+  // 8. CLOCK / TIME
   const timeTriggers = ["time", "watch", "clock", "samayam", "time entha", "samay", "neram", "ghadi"];
   if (timeTriggers.some(w => p.includes(w))) {
     const timeStr = new Date().toLocaleTimeString("en-IN", { hour: "numeric", minute: "2-digit", hour12: true });
@@ -346,7 +373,7 @@ function executeSingleAction(p) {
     return true;
   }
 
-  // 8. WEATHER RADAR HUD
+  // 9. WEATHER RADAR HUD
   if (p.includes("weather") || p.includes("rain") || p.includes("climate") || p.includes("varsham") || p.includes("mausam")) {
     const reply = "Streaming live radar telemetry, Boss.";
     speakVoiceQuick(reply);
@@ -359,7 +386,7 @@ function executeSingleAction(p) {
     return true;
   }
 
-  // 9. LIVE CRICKET HUD
+  // 10. LIVE CRICKET HUD
   if (p.includes("cricket") || p.includes("score") || p.includes("ipl") || p.includes("match")) {
     const reply = "Streaming live cricket scorecard in HUD, Boss.";
     speakVoiceQuick(reply);
@@ -368,7 +395,7 @@ function executeSingleAction(p) {
     return true;
   }
 
-  // 10. CALCULATOR
+  // 11. CALCULATOR
   if (p.includes("calculator") || p.includes("calculate") || p.includes("lekkalu") || p.includes("hisab")) {
     const reply = "Deploying math processing matrix, Boss.";
     speakVoiceQuick(reply);
@@ -377,7 +404,7 @@ function executeSingleAction(p) {
     return true;
   }
 
-  // 11. WIKIPEDIA
+  // 12. WIKIPEDIA
   if (p.startsWith("wiki") || p.startsWith("who is") || p.startsWith("what is")) {
     const topic = p.replace(/^(wiki|who is|what is|tell me about)/gi, "").trim();
     if (topic.length > 2) {
@@ -389,8 +416,8 @@ function executeSingleAction(p) {
     }
   }
 
-  // 12. YOUTUBE / SPOTIFY STREAMING
-  const musicTriggers = ["play", "paly", "ply", "song", "songs", "paata", "paatalu", "music", "youtube", "spotify"];
+  // 13. MUSIC / SONG SEARCH
+  const musicTriggers = ["play", "paly", "ply", "song", "songs", "paata", "paatalu", "music", "spotify"];
   if (musicTriggers.some(w => p.includes(w))) {
     let cleanQuery = p
       .replace(/when\s+(i\s+have\s+to|do\s+i|should\s+i)/gi, "")
@@ -411,6 +438,7 @@ function executeSingleAction(p) {
       speakVoiceQuick(reply);
       updateUI(reply, `Launching YouTube: "${cleanQuery}"`);
       launchAndroidIntent(
+        `vnd.youtube://results?q=${encodeURIComponent(cleanQuery)}`,
         `intent://www.youtube.com/results?search_query=${encodeURIComponent(cleanQuery)}#Intent;scheme=https;package=com.google.android.youtube;end`,
         `https://www.youtube.com/results?search_query=${encodeURIComponent(cleanQuery)}`
       );
@@ -476,7 +504,7 @@ function startCommandListening() {
 
     const finalQuery = collectedTranscript.trim();
 
-    // FILTER OUT BRACKETS / PUNCTUATION-ONLY SOUNDS LIKE "("
+    // Filter out punctuation-only or single character sounds like "("
     const cleaned = finalQuery.replace(/[^a-zA-Z0-9]/g, "").trim();
     if (cleaned.length < 2) {
       setJarvisVisualState("IDLE");
@@ -486,7 +514,7 @@ function startCommandListening() {
     }
 
     // 1. Check local native intents first
-    const handled = executeSingleAction(finalQuery.toLowerCase());
+    const handled = executeSingleAction(finalQuery);
     if (handled) {
       setJarvisVisualState("IDLE");
       resumeWakeEngine();
@@ -597,7 +625,7 @@ async function handleDirectCommand(prompt) {
 
   updateUI(`"${prompt}"`, `Direct Prompt: "${prompt}"`);
   
-  const wasHandled = executeSingleAction(prompt.toLowerCase());
+  const wasHandled = executeSingleAction(prompt);
   if (wasHandled) {
     setJarvisVisualState("IDLE");
     resumeWakeEngine();

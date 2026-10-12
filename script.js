@@ -1,5 +1,5 @@
 // =========================================================================
-// J.A.R.V.I.S. MK-VII RUNTIME: FULL SCRIPT (INTENTS + VOICE + WAKE + HUD)
+// J.A.R.V.I.S. MK-VII RUNTIME: FULL SCRIPT (TRIPLE-TAP FULLSCREEN HUD INTEGRATED)
 // =========================================================================
 
 const WORKER_ENDPOINT = "https://jarvis-automation.saidamvamshi97.workers.dev/api/ask";
@@ -87,8 +87,8 @@ function speakVoiceQuick(text) {
     utterance.voice = maleVoice;
   }
 
-  utterance.pitch = 0.78; // Low frequency robotic resonance
-  utterance.rate = 1.05;  // Calculated tempo
+  utterance.pitch = 0.78;
+  utterance.rate = 1.05;
   utterance.volume = 1.0;
 
   window.speechSynthesis.speak(utterance);
@@ -215,7 +215,7 @@ function updateUI(mainText, debugText) {
 }
 
 // -------------------------------------------------------------------------
-// HUD MODAL CONTROLLER
+// HUD MODAL CONTROLLER & TRIPLE-TAP FULLSCREEN
 // -------------------------------------------------------------------------
 function openUniversalApp(appName, embedUrl, deepLinkUrl) {
   const modal = document.getElementById("universalAppModal");
@@ -233,15 +233,57 @@ function openUniversalApp(appName, embedUrl, deepLinkUrl) {
   }
 
   if (frame) frame.src = embedUrl;
-  if (modal) modal.style.display = "flex";
+  if (modal) {
+    modal.classList.remove("fullscreen-mode"); // Start in mini mode
+    modal.style.display = "flex";
+  }
 }
 
 function closeUniversalApp() {
   const modal = document.getElementById("universalAppModal");
   const frame = document.getElementById("appHudFrame");
-  if (modal) modal.style.display = "none";
+  if (modal) {
+    modal.style.display = "none";
+    modal.classList.remove("fullscreen-mode"); // Reset back to mini size
+  }
   if (frame) frame.src = "";
   setJarvisVisualState("IDLE");
+}
+
+let tapCount = 0;
+let tapTimer = null;
+
+function setupMiniScreenTripleTap() {
+  const modal = document.getElementById("universalAppModal");
+  if (!modal) return;
+
+  modal.addEventListener("pointerdown", (e) => {
+    // Avoid triggering when tapping controls
+    if (e.target.closest(".hud-close-btn") || e.target.closest(".pip-btn")) {
+      return;
+    }
+
+    tapCount++;
+
+    if (tapCount === 1) {
+      tapTimer = setTimeout(() => {
+        tapCount = 0;
+      }, 500); // 500ms multi-tap capture window
+    } else if (tapCount === 3) {
+      clearTimeout(tapTimer);
+      tapCount = 0;
+
+      const isFullscreen = modal.classList.toggle("fullscreen-mode");
+
+      playFuturisticChime("PROCESSING");
+      if ("vibrate" in navigator) navigator.vibrate([30, 40, 30]);
+
+      updateUI(
+        isFullscreen ? "HUD Expanded Fullscreen" : "HUD Restored Mini Mode",
+        "Gesture: Triple Tap Activated"
+      );
+    }
+  });
 }
 
 // -------------------------------------------------------------------------
@@ -272,7 +314,6 @@ function launchAndroidIntent(deepLink, intentFallback, webFallback) {
 }
 
 function executeSingleAction(rawPrompt) {
-  // Normalize prompt: lowercase and strip out symbols/punctuation
   const p = rawPrompt.toLowerCase().replace(/[^a-z0-9\s]/g, " ").trim();
 
   // 1. INSTAGRAM INTENT
@@ -314,7 +355,7 @@ function executeSingleAction(rawPrompt) {
     return true;
   }
 
-  // 4. YOUTUBE APP INTENT (Direct launch)
+  // 4. YOUTUBE APP INTENT
   if (/\b(youtube|yt)\b/.test(p) && !p.includes("play") && !p.includes("search")) {
     const reply = "Launching YouTube, Boss.";
     speakVoiceQuick(reply);
@@ -504,7 +545,6 @@ function startCommandListening() {
 
     const finalQuery = collectedTranscript.trim();
 
-    // Filter out punctuation-only or single character sounds like "("
     const cleaned = finalQuery.replace(/[^a-zA-Z0-9]/g, "").trim();
     if (cleaned.length < 2) {
       setJarvisVisualState("IDLE");
@@ -513,7 +553,6 @@ function startCommandListening() {
       return;
     }
 
-    // 1. Check local native intents first
     const handled = executeSingleAction(finalQuery);
     if (handled) {
       setJarvisVisualState("IDLE");
@@ -521,7 +560,6 @@ function startCommandListening() {
       return;
     }
 
-    // 2. Dispatch to Cloud AI Brain with Memory
     setJarvisVisualState("THINKING");
     playFuturisticChime("PROCESSING");
 
@@ -687,7 +725,7 @@ async function toggleWakeWord() {
 }
 
 // -------------------------------------------------------------------------
-// SIRI BUTTON CONTROLLER
+// SIRI BUTTON & GESTURE INITIALIZATION
 // -------------------------------------------------------------------------
 function setupSiriButton() {
   const btn = document.getElementById("siriSpeakBtn");
@@ -703,4 +741,7 @@ function setupSiriButton() {
   });
 }
 
-document.addEventListener("DOMContentLoaded", setupSiriButton);
+document.addEventListener("DOMContentLoaded", () => {
+  setupSiriButton();
+  setupMiniScreenTripleTap();
+});

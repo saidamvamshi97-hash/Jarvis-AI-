@@ -1,5 +1,5 @@
 // =========================================================================
-// J.A.R.V.I.S. MK-VII: RAIL INTELLIGENCE + TELEGRAM CROSSING ALERT + FULL HUD
+// J.A.R.V.I.S. MK-VIII: HIGHWAY COPILOT (>60 KM/H SPEED TRIGGER + AMENITIES)
 // =========================================================================
 
 const WORKER_ENDPOINT = "https://jarvis-automation.saidamvamshi97.workers.dev";
@@ -20,9 +20,11 @@ let collectedTranscript = "";
 let audioCtx = null;
 let availableVoices = [];
 
-// Railway Active Tracking Interval
-let trainTelemetryTimer = null;
-let activeMonitoredTrain = null;
+// Live GPS Speed & Location State
+let currentLat = 17.3850;
+let currentLon = 78.4867;
+let currentSpeedKmh = 0;
+let hasTriggeredHighSpeedAlert = false;
 
 // -------------------------------------------------------------------------
 // AUDIO ENGINE & VOICE INITIALIZATION
@@ -90,123 +92,115 @@ function speakVoiceQuick(text) {
 }
 
 // -------------------------------------------------------------------------
-// AMBIENT TELEMETRY & TONE SYNTHESIS
+// LIVE GPS SPEEDOMETER & HIGHWAY AUTO-ACTIVATION (>60 KM/H)
 // -------------------------------------------------------------------------
-async function updateAmbientTelemetry() {
-  const batEl = document.getElementById("batteryStat");
-  const netEl = document.getElementById("networkStat");
+function initGpsSpeedometer() {
+  if (!("geolocation" in navigator)) return;
 
-  if (navigator.getBattery && batEl) {
-    try {
-      const bat = await navigator.getBattery();
-      const setLevel = () => {
-        batEl.innerText = `${Math.round(bat.level * 100)}%${bat.charging ? " ⚡" : ""}`;
-      };
-      setLevel();
-      bat.addEventListener("levelchange", setLevel);
-      bat.addEventListener("chargingchange", setLevel);
-    } catch (e) {}
+  const options = {
+    enableHighAccuracy: true,
+    maximumAge: 1000,
+    timeout: 5000
+  };
+
+  navigator.geolocation.watchPosition(
+    (pos) => {
+      currentLat = pos.coords.latitude;
+      currentLon = pos.coords.longitude;
+
+      // Speed is provided in meters/second -> convert to km/h
+      const speedMps = pos.coords.speed || 0;
+      currentSpeedKmh = Math.round(speedMps * 3.6);
+
+      const speedEl = document.getElementById("speedStat");
+      const modeEl = document.getElementById("modeStat");
+
+      if (speedEl) speedEl.innerText = `${currentSpeedKmh} KM/H`;
+
+      // AUTONOMOUS HIGH-SPEED VEHICLE TRIGGER (> 60 KM/H)
+      if (currentSpeedKmh >= 60) {
+        if (modeEl) {
+          modeEl.innerText = "HIGHWAY";
+          modeEl.style.color = "#ff9900";
+        }
+
+        if (!hasTriggeredHighSpeedAlert) {
+          hasTriggeredHighSpeedAlert = true;
+          triggerHighwayCopilotActivation();
+        }
+      } else if (currentSpeedKmh < 45) {
+        // Reset trigger once speed drops
+        hasTriggeredHighSpeedAlert = false;
+        if (modeEl) {
+          modeEl.innerText = "CRUISE";
+          modeEl.style.color = "#00ffff";
+        }
+      }
+    },
+    (err) => console.warn("GPS Speedometer:", err.message),
+    options
+  );
+}
+
+// Autonomous high-speed protocol activation
+async function triggerHighwayCopilotActivation() {
+  playFuturisticChime("WAKE");
+  triggerHaptic("WAKE");
+
+  const alertText = `Velocity exceeded 60 km/h, Boss. Highway Copilot active. Monitoring upcoming tolls, fuel stations, hospitals, and repair shops.`;
+  speakVoiceQuick(alertText);
+  updateUI(alertText, "Autonomous Mode: Highway Radar Engaged");
+
+  // Send priority Telegram telemetry
+  fetch(`${WORKER_ENDPOINT}/api/telegram/alert`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      message: `🏎️ *High-Speed Highway Mode Activated*\nCurrent Speed: ${currentSpeedKmh} km/h\nCoordinates: \`${currentLat.toFixed(4)},${currentLon.toFixed(4)}\`\nAmenities radar active.`
+    })
+  }).catch(() => {});
+}
+
+// -------------------------------------------------------------------------
+// HIGHWAY RADAR DISPATCHER (FUEL, TOLLS, HOSPITALS, REPAIR)
+// -------------------------------------------------------------------------
+async function scanHighwayAmenity(type) {
+  let label = "Fuel Station";
+  let mapsQuery = "petrol pump near me";
+
+  if (type === "toll") {
+    label = "Toll Plaza";
+    mapsQuery = "toll plaza on my route";
+  } else if (type === "hospital") {
+    label = "Emergency Hospital";
+    mapsQuery = "emergency hospital near me";
+  } else if (type === "repair") {
+    label = "Vehicle Mechanic & Tyre Repair";
+    mapsQuery = "car bike puncture vehicle repair shop near me";
   }
 
-  if (netEl) {
-    const updateNet = () => {
-      netEl.innerText = navigator.onLine ? "ONLINE" : "OFFLINE";
-      netEl.style.color = navigator.onLine ? "#00ffff" : "#ff0055";
-    };
-    updateNet();
-    window.addEventListener("online", updateNet);
-    window.addEventListener("offline", updateNet);
-  }
-}
-document.addEventListener("DOMContentLoaded", updateAmbientTelemetry);
+  const announcing = `Scanning corridor for nearest ${label}, Boss.`;
+  speakVoiceQuick(announcing);
+  updateUI(announcing, `Radar: Locating ${label}...`);
+  setJarvisVisualState("THINKING");
 
-function playFuturisticChime(type) {
-  try {
-    initAudioEngine();
-    if (!audioCtx) return;
+  // Embed live Google Maps radar inside the HUD modal
+  openUniversalApp(
+    `RADAR // ${label.toUpperCase()}`,
+    `https://maps.google.com/maps?q=${encodeURIComponent(mapsQuery)}&t=&z=13&ie=UTF8&iwloc=&output=embed`,
+    `https://www.google.com/maps/search/${encodeURIComponent(mapsQuery)}`
+  );
 
-    const osc = audioCtx.createOscillator();
-    const gain = audioCtx.createGain();
-    osc.connect(gain);
-    gain.connect(audioCtx.destination);
+  // Dispatch background telegram notification
+  fetch(`${WORKER_ENDPOINT}/api/telegram/alert`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      message: `📍 *Highway Amenity Inquiry: ${label}*\nSpeed: ${currentSpeedKmh} km/h\nRadar dispatched in HUD.`
+    })
+  }).catch(() => {});
 
-    const now = audioCtx.currentTime;
-
-    if (type === "WAKE") {
-      osc.type = "sine";
-      osc.frequency.setValueAtTime(587.33, now);
-      osc.frequency.exponentialRampToValueAtTime(880, now + 0.12);
-      gain.gain.setValueAtTime(0.18, now);
-      gain.gain.exponentialRampToValueAtTime(0.001, now + 0.28);
-      osc.start(now);
-      osc.stop(now + 0.28);
-    } else if (type === "PROCESSING") {
-      osc.type = "triangle";
-      osc.frequency.setValueAtTime(440, now);
-      osc.frequency.exponentialRampToValueAtTime(1320, now + 0.1);
-      gain.gain.setValueAtTime(0.12, now);
-      gain.gain.exponentialRampToValueAtTime(0.001, now + 0.15);
-      osc.start(now);
-      osc.stop(now + 0.15);
-    } else if (type === "OFF") {
-      osc.type = "sawtooth";
-      osc.frequency.setValueAtTime(520, now);
-      osc.frequency.exponentialRampToValueAtTime(120, now + 0.25);
-      gain.gain.setValueAtTime(0.15, now);
-      gain.gain.exponentialRampToValueAtTime(0.001, now + 0.25);
-      osc.start(now);
-      osc.stop(now + 0.25);
-    }
-  } catch (e) {}
-}
-
-function triggerHaptic(type) {
-  if (!("vibrate" in navigator)) return;
-  if (type === "WAKE") navigator.vibrate([40, 60, 50]);
-  else if (type === "OFF") navigator.vibrate(30);
-}
-
-function setJarvisVisualState(state) {
-  const orb = document.querySelector(".orb-inner");
-  const ring = document.querySelector(".orb-ring");
-  const glow = document.querySelector(".orb-glow");
-  const siriWrapper = document.querySelector(".siri-button-wrapper");
-
-  if (state === "IDLE") {
-    if (orb) {
-      orb.style.backgroundColor = "#00ffff";
-      orb.style.boxShadow = "0 0 28px #00ffff";
-      orb.style.transform = "scale(1)";
-    }
-    if (ring) ring.style.borderColor = "#00ffff";
-    if (glow) glow.style.background = "radial-gradient(circle, rgba(0,255,255,0.4) 0%, rgba(0,255,255,0) 70%)";
-    if (siriWrapper) siriWrapper.classList.remove("active");
-  } else if (state === "LISTENING") {
-    if (orb) {
-      orb.style.backgroundColor = "#00ff77";
-      orb.style.boxShadow = "0 0 38px #00ff77";
-      orb.style.transform = "scale(1.15)";
-    }
-    if (ring) ring.style.borderColor = "#00ff77";
-    if (glow) glow.style.background = "radial-gradient(circle, rgba(0,255,119,0.5) 0%, rgba(0,255,119,0) 70%)";
-    if (siriWrapper) siriWrapper.classList.add("active");
-  } else if (state === "THINKING") {
-    if (orb) {
-      orb.style.backgroundColor = "#ff9900";
-      orb.style.boxShadow = "0 0 45px #ff9900";
-      orb.style.transform = "scale(1.05)";
-    }
-    if (ring) ring.style.borderColor = "#ff9900";
-    if (glow) glow.style.background = "radial-gradient(circle, rgba(255,153,0,0.5) 0%, rgba(255,153,0) 70%)";
-    if (siriWrapper) siriWrapper.classList.add("active");
-  }
-}
-
-function updateUI(mainText, debugText) {
-  const box = document.getElementById("responseBox");
-  const debug = document.getElementById("debugBox");
-  if (box) box.innerText = mainText;
-  if (debug && debugText) debug.innerText = debugText;
+  return true;
 }
 
 // -------------------------------------------------------------------------
@@ -275,85 +269,6 @@ function setupMiniScreenTripleTap() {
 }
 
 // -------------------------------------------------------------------------
-// AUTONOMOUS RAILWAY INTELLIGENCE (FASTEST TRAIN + CROSSING MONITOR)
-// -------------------------------------------------------------------------
-async function handleTrainSearchAndTracking(p) {
-  // Extract Source and Destination automatically
-  let src = "Secunderabad";
-  let dst = "Tiruvannamalai";
-
-  const toMatch = p.match(/(?:from|to|between)\s+([a-zA-Z\s]+?)\s+(?:to|and)\s+([a-zA-Z\s]+)/i);
-  if (toMatch) {
-    src = toMatch[1].trim();
-    dst = toMatch[2].trim();
-  } else {
-    const singleTo = p.match(/(?:to|for)\s+([a-zA-Z\s]+)/i);
-    if (singleTo) dst = singleTo[1].trim();
-  }
-
-  const announcing = `Calculating fastest rail corridor from ${src} to ${dst}, Boss.`;
-  speakVoiceQuick(announcing);
-  updateUI(announcing, "Rail Core: Querying NTES Schedule...");
-  setJarvisVisualState("THINKING");
-
-  try {
-    const res = await fetch(`${WORKER_ENDPOINT}/api/train/find-fastest`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ source: src, destination: dst })
-    });
-
-    const info = await res.json();
-    activeMonitoredTrain = info.trainNumber;
-
-    const summary = `Fastest route is Train #${info.trainNumber} - ${info.trainName}, taking ${info.duration}. Autonomous crossing radar is now locked on.`;
-    speakVoiceQuick(summary);
-    updateUI(summary, `Tracking: #${info.trainNumber} | Alerts -> Telegram`);
-
-    // Open Live Running Status directly in Holographic HUD
-    openUniversalApp(
-      `RAIL // #${info.trainNumber}`,
-      `https://runningstatus.in/status/${info.trainNumber}-today`,
-      `https://runningstatus.in/status/${info.trainNumber}`
-    );
-
-    // Start 60-Second Autonomous Crossing & Outer Signal Watchdog
-    startAutonomousCrossingWatchdog(info.trainNumber);
-    return true;
-  } catch (err) {
-    const errText = `Identified fastest train #${activeMonitoredTrain || '20498'} to ${dst}. Live status launched in HUD, Boss.`;
-    speakVoiceQuick(errText);
-    openUniversalApp(
-      `RAIL TRACKER // ${dst}`,
-      `https://runningstatus.in/status/20498-today`,
-      `https://runningstatus.in`
-    );
-    return true;
-  }
-}
-
-function startAutonomousCrossingWatchdog(trainNum) {
-  if (trainTelemetryTimer) clearInterval(trainTelemetryTimer);
-
-  // Polls NTES every 60 seconds autonomously in background
-  trainTelemetryTimer = setInterval(async () => {
-    try {
-      const res = await fetch(`${WORKER_ENDPOINT}/api/train/track-crossing`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ trainNumber: trainNum })
-      });
-      const data = await res.json();
-
-      if (data.isStoppedAtSignal) {
-        updateUI(`⚠️ ALERT: Train #${trainNum} Halted for Crossing!`, "Telegram message dispatched.");
-        playFuturisticChime("PROCESSING");
-      }
-    } catch (e) {}
-  }, 60000);
-}
-
-// -------------------------------------------------------------------------
 // ANDROID NATIVE INTENT DISPATCHER
 // -------------------------------------------------------------------------
 function launchAndroidIntent(deepLink, intentFallback, webFallback) {
@@ -376,87 +291,64 @@ function launchAndroidIntent(deepLink, intentFallback, webFallback) {
   }
 }
 
+// -------------------------------------------------------------------------
+// LOCAL COMMAND ENGINE
+// -------------------------------------------------------------------------
 function executeSingleAction(rawPrompt) {
   const p = rawPrompt.toLowerCase().replace(/[^a-z0-9\s]/g, " ").trim();
 
-  // 1. AUTONOMOUS TRAIN & CROSSING TRACKING INTENT
-  if (/\b(train|trains|rail|railway|crossing|bogey|station|fastest train)\b/.test(p)) {
-    handleTrainSearchAndTracking(p);
+  // 1. HIGHWAY RADAR INTENTS (FUEL, TOLLS, HOSPITALS, REPAIR)
+  if (p.includes("fuel") || p.includes("petrol") || p.includes("diesel") || p.includes("gas station")) {
+    return scanHighwayAmenity("fuel");
+  }
+  if (p.includes("toll") || p.includes("toll gate") || p.includes("toll plaza") || p.includes("tax")) {
+    return scanHighwayAmenity("toll");
+  }
+  if (p.includes("hospital") || p.includes("doctor") || p.includes("emergency") || p.includes("medical") || p.includes("ambulance")) {
+    return scanHighwayAmenity("hospital");
+  }
+  if (p.includes("repair") || p.includes("mechanic") || p.includes("puncture") || p.includes("garage") || p.includes("breakdown")) {
+    return scanHighwayAmenity("repair");
+  }
+  if (p.includes("speed") || p.includes("how fast") || p.includes("velocity")) {
+    const reply = `Current ground velocity is ${currentSpeedKmh} kilometers per hour, Boss.`;
+    speakVoiceQuick(reply);
+    updateUI(reply, "Telemetry: GPS Velocity Readout");
     return true;
   }
 
-  // 2. INSTAGRAM INTENT
+  // 2. APPS (INSTAGRAM, WHATSAPP, TELEGRAM, YOUTUBE, CAMERA, GMAIL)
   if (/\b(instagram|insta|instgram|ig)\b/.test(p)) {
     const reply = "Launching Instagram, Boss.";
     speakVoiceQuick(reply);
     updateUI(reply, "Dispatched: Instagram");
-    launchAndroidIntent(
-      "instagram://app",
-      "intent://instagram.com/#Intent;package=com.instagram.android;scheme=https;end",
-      "https://www.instagram.com"
-    );
+    launchAndroidIntent("instagram://app", "intent://instagram.com/#Intent;package=com.instagram.android;scheme=https;end", "https://www.instagram.com");
     return true;
   }
-
-  // 3. WHATSAPP INTENT
   if (/\b(whatsapp|whats app|watsapp|wa)\b/.test(p)) {
     const reply = "Opening WhatsApp, Boss.";
     speakVoiceQuick(reply);
     updateUI(reply, "Dispatched: WhatsApp");
-    launchAndroidIntent(
-      "whatsapp://send",
-      "intent://send#Intent;package=com.whatsapp;scheme=whatsapp;end",
-      "https://web.whatsapp.com"
-    );
+    launchAndroidIntent("whatsapp://send", "intent://send#Intent;package=com.whatsapp;scheme=whatsapp;end", "https://web.whatsapp.com");
     return true;
   }
-
-  // 4. TELEGRAM INTENT
   if (/\b(telegram|tg)\b/.test(p)) {
     const reply = "Accessing Telegram, Boss.";
     speakVoiceQuick(reply);
     updateUI(reply, "Dispatched: Telegram");
-    launchAndroidIntent(
-      "tg://openmessage",
-      "intent:#Intent;package=org.telegram.messenger;scheme=tg;end",
-      "https://web.telegram.org"
-    );
+    launchAndroidIntent("tg://openmessage", "intent:#Intent;package=org.telegram.messenger;scheme=tg;end", "https://web.telegram.org");
     return true;
   }
-
-  // 5. YOUTUBE INTENT
-  if (/\b(youtube|yt)\b/.test(p) && !p.includes("play") && !p.includes("search")) {
+  if (/\b(youtube|yt)\b/.test(p) && !p.includes("play")) {
     const reply = "Launching YouTube, Boss.";
     speakVoiceQuick(reply);
     updateUI(reply, "Dispatched: YouTube");
-    launchAndroidIntent(
-      "vnd.youtube://",
-      "intent://www.youtube.com/#Intent;package=com.google.android.youtube;scheme=https;end",
-      "https://www.youtube.com"
-    );
+    launchAndroidIntent("vnd.youtube://", "intent://www.youtube.com/#Intent;package=com.google.android.youtube;scheme=https;end", "https://www.youtube.com");
     return true;
   }
 
-  // 6. CAMERA INTENT
-  if (/\b(camera|photo|picture)\b/.test(p)) {
-    const reply = "Initializing optical capture, Boss.";
-    speakVoiceQuick(reply);
-    updateUI(reply, "Dispatched: Camera");
-    launchAndroidIntent("intent:#Intent;action=android.media.action.IMAGE_CAPTURE;end", null, null);
-    return true;
-  }
-
-  // 7. GMAIL INTENT
-  if (/\b(gmail|email|mail)\b/.test(p)) {
-    const reply = "Opening mail console, Boss.";
-    speakVoiceQuick(reply);
-    updateUI(reply, "Dispatched: Gmail");
-    launchAndroidIntent("googlegmail://", "intent:#Intent;package=com.google.android.gm;scheme=googlegmail;end", "https://mail.google.com");
-    return true;
-  }
-
-  // 8. BATTERY DIAGNOSTIC
-  if (p.includes("battery") || p.includes("charge") || p.includes("power level")) {
+  // 3. HARDWARE & CLOCK
+  if (p.includes("battery") || p.includes("charge")) {
     const batEl = document.getElementById("batteryStat");
     const val = batEl ? batEl.innerText : "Nominal";
     const reply = `Power reserves are at ${val}, Boss. All systems green.`;
@@ -464,10 +356,7 @@ function executeSingleAction(rawPrompt) {
     updateUI(reply, "Action: Battery Diagnostic");
     return true;
   }
-
-  // 9. CLOCK / TIME
-  const timeTriggers = ["time", "watch", "clock", "samayam", "time entha", "samay", "neram", "ghadi"];
-  if (timeTriggers.some(w => p.includes(w))) {
+  if (["time", "watch", "clock", "samayam"].some(w => p.includes(w))) {
     const timeStr = new Date().toLocaleTimeString("en-IN", { hour: "numeric", minute: "2-digit", hour12: true });
     const reply = `The time is ${timeStr}, Boss.`;
     speakVoiceQuick(reply);
@@ -475,72 +364,11 @@ function executeSingleAction(rawPrompt) {
     return true;
   }
 
-  // 10. WEATHER RADAR HUD
-  if (p.includes("weather") || p.includes("rain") || p.includes("climate") || p.includes("varsham") || p.includes("mausam")) {
-    const reply = "Streaming live radar telemetry, Boss.";
-    speakVoiceQuick(reply);
-    updateUI(reply, "Dispatched: Weather Radar");
-    openUniversalApp(
-      "Weather Radar",
-      "https://embed.windy.com/embed2.html?lat=16.36&lon=78.06&detailLat=16.36&detailLon=78.06&width=400&height=250&zoom=7&level=surface&overlay=radar&product=radar&menu=&message=&marker=&calendar=now&pressure=&type=map&location=coordinates&detail=&metricWind=km%2Fh&metricTemp=%C2%B0C&radarRange=-1",
-      "https://www.windy.com"
-    );
-    return true;
-  }
-
-  // 11. LIVE CRICKET HUD
-  if (p.includes("cricket") || p.includes("score") || p.includes("ipl") || p.includes("match")) {
-    const reply = "Streaming live cricket scorecard in HUD, Boss.";
-    speakVoiceQuick(reply);
-    updateUI(reply, "Dispatched: Cricket Scores");
-    openUniversalApp("Live Cricket", "https://m.cricbuzz.com/cricket-match/live-scores", "https://www.cricbuzz.com");
-    return true;
-  }
-
-  // 12. CALCULATOR
-  if (p.includes("calculator") || p.includes("calculate") || p.includes("lekkalu") || p.includes("hisab")) {
-    const reply = "Deploying math processing matrix, Boss.";
-    speakVoiceQuick(reply);
-    updateUI(reply, "Dispatched: Calculator");
-    openUniversalApp("Calculator", "https://www.desmos.com/scientific", "https://www.desmos.com/scientific");
-    return true;
-  }
-
-  // 13. MUSIC / SONG SEARCH
-  const musicTriggers = ["play", "paly", "ply", "song", "songs", "paata", "paatalu", "music", "spotify"];
-  if (musicTriggers.some(w => p.includes(w))) {
-    let cleanQuery = p
-      .replace(/when\s+(i\s+have\s+to|do\s+i|should\s+i)/gi, "")
-      .replace(/^(hey jarvis|jarvis|please|bhayya|mama|bro|can you)/gi, "")
-      .replace(/\b(play|paly|ply|start|listen to|watch|open|choodu|vinu|pettu|lagao|chalao)\b/gi, "")
-      .replace(/\b(on youtube|in youtube|youtube|on spotify|spotify|lo|la)\b/gi, "")
-      .trim();
-
-    if (!cleanQuery) cleanQuery = "Telugu latest hit songs";
-
-    if (p.includes("spotify")) {
-      const reply = `Streaming ${cleanQuery} on Spotify, Boss.`;
-      speakVoiceQuick(reply);
-      updateUI(reply, `Dispatched: Spotify -> "${cleanQuery}"`);
-      openUniversalApp(`Spotify // ${cleanQuery}`, `https://open.spotify.com/embed/search/${encodeURIComponent(cleanQuery)}`, `spotify:search:${encodeURIComponent(cleanQuery)}`);
-    } else {
-      const reply = `Playing ${cleanQuery} on YouTube, Boss.`;
-      speakVoiceQuick(reply);
-      updateUI(reply, `Launching YouTube: "${cleanQuery}"`);
-      launchAndroidIntent(
-        `vnd.youtube://results?q=${encodeURIComponent(cleanQuery)}`,
-        `intent://www.youtube.com/results?search_query=${encodeURIComponent(cleanQuery)}#Intent;scheme=https;package=com.google.android.youtube;end`,
-        `https://www.youtube.com/results?search_query=${encodeURIComponent(cleanQuery)}`
-      );
-    }
-    return true;
-  }
-
   return false;
 }
 
 // -------------------------------------------------------------------------
-// 5-SECOND COMMAND CAPTURE & RECOGNITION
+// 5-SECOND COMMAND CAPTURE ENGINE
 // -------------------------------------------------------------------------
 function resetSilenceTimer() {
   if (speechCaptureTimer) clearTimeout(speechCaptureTimer);
@@ -615,12 +443,8 @@ function startCommandListening() {
       const res = await fetch(`${WORKER_ENDPOINT}/api/ask`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          prompt: finalQuery,
-          history: conversationMemory
-        })
+        body: JSON.stringify({ prompt: finalQuery, history: conversationMemory })
       });
-
       const data = await res.json();
       const reply = data.reply || "Done, Boss.";
 
@@ -705,7 +529,6 @@ async function handleDirectCommand(prompt) {
   }
 
   updateUI(`"${prompt}"`, `Direct Prompt: "${prompt}"`);
-  
   const wasHandled = executeSingleAction(prompt);
   if (wasHandled) {
     setJarvisVisualState("IDLE");
@@ -767,24 +590,104 @@ async function toggleWakeWord() {
   }
 }
 
-// -------------------------------------------------------------------------
-// SIRI BUTTON & GESTURE INITIALIZATION
-// -------------------------------------------------------------------------
-function setupSiriButton() {
-  const btn = document.getElementById("siriSpeakBtn");
-  if (!btn) return;
+// Visual and Sound Synthesizer Utilities
+function playFuturisticChime(type) {
+  try {
+    initAudioEngine();
+    if (!audioCtx) return;
 
-  btn.addEventListener("pointerdown", (e) => {
-    e.preventDefault();
-    if ("speechSynthesis" in window) window.speechSynthesis.cancel();
-    playFuturisticChime("WAKE");
-    if ("vibrate" in navigator) navigator.vibrate(35);
-    setJarvisVisualState("LISTENING");
-    startCommandListening();
-  });
+    const osc = audioCtx.createOscillator();
+    const gain = audioCtx.createGain();
+    osc.connect(gain);
+    gain.connect(audioCtx.destination);
+
+    const now = audioCtx.currentTime;
+    if (type === "WAKE") {
+      osc.type = "sine";
+      osc.frequency.setValueAtTime(587.33, now);
+      osc.frequency.exponentialRampToValueAtTime(880, now + 0.12);
+      gain.gain.setValueAtTime(0.18, now);
+      gain.gain.exponentialRampToValueAtTime(0.001, now + 0.28);
+      osc.start(now);
+      osc.stop(now + 0.28);
+    } else if (type === "PROCESSING") {
+      osc.type = "triangle";
+      osc.frequency.setValueAtTime(440, now);
+      osc.frequency.exponentialRampToValueAtTime(1320, now + 0.1);
+      gain.gain.setValueAtTime(0.12, now);
+      gain.gain.exponentialRampToValueAtTime(0.001, now + 0.15);
+      osc.start(now);
+      osc.stop(now + 0.15);
+    } else if (type === "OFF") {
+      osc.type = "sawtooth";
+      osc.frequency.setValueAtTime(520, now);
+      osc.frequency.exponentialRampToValueAtTime(120, now + 0.25);
+      gain.gain.setValueAtTime(0.15, now);
+      gain.gain.exponentialRampToValueAtTime(0.001, now + 0.25);
+      osc.start(now);
+      osc.stop(now + 0.25);
+    }
+  } catch (e) {}
 }
 
+function triggerHaptic(type) {
+  if (!("vibrate" in navigator)) return;
+  if (type === "WAKE") navigator.vibrate([40, 60, 50]);
+  else if (type === "OFF") navigator.vibrate(30);
+}
+
+function setJarvisVisualState(state) {
+  const orb = document.querySelector(".orb-inner");
+  const ring = document.querySelector(".orb-ring");
+  const glow = document.querySelector(".orb-glow");
+  const siriWrapper = document.querySelector(".siri-button-wrapper");
+
+  if (state === "IDLE") {
+    if (orb) {
+      orb.style.backgroundColor = "#00ffff";
+      orb.style.boxShadow = "0 0 28px #00ffff";
+      orb.style.transform = "scale(1)";
+    }
+    if (ring) ring.style.borderColor = "#00ffff";
+    if (glow) glow.style.background = "radial-gradient(circle, rgba(0,255,255,0.4) 0%, rgba(0,255,255,0) 70%)";
+    if (siriWrapper) siriWrapper.classList.remove("active");
+  } else if (state === "LISTENING") {
+    if (orb) {
+      orb.style.backgroundColor = "#00ff77";
+      orb.style.boxShadow = "0 0 38px #00ff77";
+      orb.style.transform = "scale(1.15)";
+    }
+    if (ring) ring.style.borderColor = "#00ff77";
+    if (glow) glow.style.background = "radial-gradient(circle, rgba(0,255,119,0.5) 0%, rgba(0,255,119,0) 70%)";
+    if (siriWrapper) siriWrapper.classList.add("active");
+  } else if (state === "THINKING") {
+    if (orb) {
+      orb.style.backgroundColor = "#ff9900";
+      orb.style.boxShadow = "0 0 45px #ff9900";
+      orb.style.transform = "scale(1.05)";
+    }
+    if (ring) ring.style.borderColor = "#ff9900";
+    if (glow) glow.style.background = "radial-gradient(circle, rgba(255,153,0,0.5) 0%, rgba(255,153,0) 70%)";
+    if (siriWrapper) siriWrapper.classList.add("active");
+  }
+}
+
+// -------------------------------------------------------------------------
+// INITIALIZE HIGHWAY COPILOT ON PAGE READY
+// -------------------------------------------------------------------------
 document.addEventListener("DOMContentLoaded", () => {
-  setupSiriButton();
+  const btn = document.getElementById("siriSpeakBtn");
+  if (btn) {
+    btn.addEventListener("pointerdown", (e) => {
+      e.preventDefault();
+      if ("speechSynthesis" in window) window.speechSynthesis.cancel();
+      playFuturisticChime("WAKE");
+      if ("vibrate" in navigator) navigator.vibrate(35);
+      setJarvisVisualState("LISTENING");
+      startCommandListening();
+    });
+  }
+
   setupMiniScreenTripleTap();
+  initGpsSpeedometer();
 });

@@ -20,7 +20,7 @@ body {
   justify-content: space-between;
   align-items: center;
   height: 100%;
-  padding: 24px 16px 36px 16px;
+  padding: 20px 16px 28px 16px;
   position: relative;
   z-index: 1;
 }
@@ -29,7 +29,8 @@ body {
   content: " ";
   position: absolute;
   top: 0; left: 0; width: 100%; height: 100%;
-  background: linear-gradient(rgba(18, 16, 16, 0) 50%, rgba(0, 255, 255, 0.02) 50%), linear-gradient(90deg, rgba(255, 0, 0, 0.02), rgba(0, 255, 255, 0.01), rgba(0, 0, 255, 0.02));
+  background: linear-gradient(rgba(18, 16, 16, 0) 50%, rgba(0, 255, 255, 0.02) 50%), 
+              linear-gradient(90deg, rgba(255, 0, 0, 0.02), rgba(0, 255, 255, 0.01), rgba(0, 0, 255, 0.02));
   background-size: 100% 3px, 6px 100%;
   pointer-events: none;
   z-index: 0;
@@ -43,7 +44,10 @@ body {
   z-index: 2;
 }
 
-.status-badge {
+.telemetry-pill {
+  display: flex;
+  align-items: center;
+  gap: 8px;
   font-size: 11px;
   letter-spacing: 2px;
   font-weight: 700;
@@ -51,6 +55,35 @@ body {
   border: 1px solid rgba(0, 255, 255, 0.4);
   border-radius: 6px;
   background: rgba(0, 255, 255, 0.05);
+}
+
+.pulse-indicator {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #00ffff;
+  box-shadow: 0 0 8px #00ffff;
+  animation: beacon 1.8s infinite;
+}
+
+.hud-top-telemetry {
+  width: 100%;
+  display: flex;
+  justify-content: space-around;
+  padding: 8px 0;
+  border-bottom: 1px solid rgba(0, 255, 255, 0.15);
+  font-size: 10px;
+  letter-spacing: 1px;
+  z-index: 2;
+}
+
+.stat-block {
+  display: flex;
+  gap: 6px;
+}
+
+.stat-label {
+  color: rgba(0, 255, 255, 0.5);
 }
 
 .wake-btn {
@@ -152,7 +185,7 @@ body {
   border-radius: 50%;
   background: #00ffff;
   box-shadow: 0 0 32px #00ffff;
-  transition: transform 0.08s ease, background-color 0.3s ease, box-shadow 0.3s ease;
+  transition: transform 0.15s ease, background-color 0.3s ease;
 }
 
 .hud-telemetry {
@@ -176,7 +209,7 @@ body {
   width: 0%;
   height: 100%;
   background: #00ff77;
-  transition: width 0.08s ease;
+  transition: width 0.1s ease;
 }
 
 .terminal-box {
@@ -194,9 +227,6 @@ body {
   letter-spacing: 0.5px;
 }
 
-/* =========================================================================
-   SIRI ANIMATED BUTTON & HALO GLOW
-   ========================================================================= */
 .bottom-bar {
   width: 100%;
   display: flex;
@@ -244,13 +274,6 @@ body {
   transition: transform 0.15s ease, border-color 0.2s ease;
 }
 
-.siri-core-wave {
-  position: absolute;
-  width: 100%;
-  height: 100%;
-  border-radius: 50%;
-}
-
 .mic-icon {
   font-size: 26px;
   filter: drop-shadow(0 0 6px rgba(0, 255, 255, 0.8));
@@ -271,11 +294,6 @@ body {
   box-shadow: 0 0 28px rgba(0, 255, 119, 0.7);
 }
 
-.siri-button-wrapper.active .mic-icon {
-  transform: scale(1.15);
-}
-
-/* Modals */
 .floating-hud-modal {
   display: none;
   position: fixed;
@@ -340,27 +358,20 @@ body {
   border: none;
 }
 
+@keyframes beacon {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.4; transform: scale(0.8); }
+}
+
 @keyframes pulse {
   0%, 100% { transform: scale(0.92); opacity: 0.6; }
   50% { transform: scale(1.08); opacity: 0.95; }
 }
 
-@keyframes rotateClockwise {
-  100% { transform: rotate(360deg); }
-}
-
-@keyframes rotateCounter {
-  100% { transform: rotate(-360deg); }
-}
-
-@keyframes radarScan {
-  100% { transform: rotate(360deg); }
-}
-
-@keyframes siriSpin {
-  100% { transform: rotate(360deg); }
-}
-
+@keyframes rotateClockwise { 100% { transform: rotate(360deg); } }
+@keyframes rotateCounter { 100% { transform: rotate(-360deg); } }
+@keyframes radarScan { 100% { transform: rotate(360deg); } }
+@keyframes siriSpin { 100% { transform: rotate(360deg); } }
 @keyframes siriPulse {
   0% { transform: scale(0.9); opacity: 0.7; }
   100% { transform: scale(1.25); opacity: 1; }

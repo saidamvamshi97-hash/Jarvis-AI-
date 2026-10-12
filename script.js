@@ -1,5 +1,5 @@
 // =========================================================================
-// J.A.R.V.I.S. MK-VII RUNTIME: FULL ANDROID NATIVE APP DISPATCHER + VOICE
+// J.A.R.V.I.S. MK-VII RUNTIME: FULL CODE (INTENT LAUNCHER + NOISE FILTER + VOICE)
 // =========================================================================
 
 const WORKER_ENDPOINT = "https://jarvis-automation.saidamvamshi97.workers.dev/api/ask";
@@ -88,7 +88,7 @@ function speakVoiceQuick(text) {
   }
 
   utterance.pitch = 0.78; // Low frequency robotic resonance
-  utterance.rate = 1.05;  // Calculated crisp tempo
+  utterance.rate = 1.05;  // Calculated tempo
   utterance.volume = 1.0;
 
   window.speechSynthesis.speak(utterance);
@@ -245,39 +245,61 @@ function closeUniversalApp() {
 }
 
 // -------------------------------------------------------------------------
-// LOCAL COMMAND & ANDROID NATIVE APP DISPATCHER
+// ANDROID NATIVE INTENT DISPATCHER
 // -------------------------------------------------------------------------
+function launchAndroidIntent(intentUrl, fallbackWebUrl) {
+  const link = document.createElement("a");
+  link.href = intentUrl;
+  link.rel = "noreferrer";
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+
+  if (fallbackWebUrl) {
+    setTimeout(() => {
+      if (!document.hidden) {
+        window.location.href = fallbackWebUrl;
+      }
+    }, 1500);
+  }
+}
+
 function executeSingleAction(p) {
-  // 1. INSTAGRAM (Direct Android App Intent)
-  if (p.includes("instagram") || p.includes("insta")) {
+  // 1. INSTAGRAM INTENT
+  const instaKeywords = ["instagram", "insta", "instgram", "istagram", "gram", "ig"];
+  if (instaKeywords.some(k => p.includes(k))) {
     const reply = "Launching Instagram, Boss.";
     speakVoiceQuick(reply);
     updateUI(reply, "Dispatched: Instagram");
-    setTimeout(() => {
-      window.location.href = "intent://instagram.com/#Intent;package=com.instagram.android;scheme=https;end";
-    }, 450);
+    launchAndroidIntent(
+      "intent://instagram.com/#Intent;package=com.instagram.android;scheme=https;end",
+      "https://www.instagram.com"
+    );
     return true;
   }
 
-  // 2. WHATSAPP
-  if (p.includes("whatsapp")) {
+  // 2. WHATSAPP INTENT
+  const waKeywords = ["whatsapp", "whats app", "watshap", "watsap"];
+  if (waKeywords.some(k => p.includes(k))) {
     const reply = "Opening WhatsApp, Boss.";
     speakVoiceQuick(reply);
     updateUI(reply, "Dispatched: WhatsApp");
-    setTimeout(() => {
-      window.location.href = "intent://send#Intent;package=com.whatsapp;scheme=whatsapp;end";
-    }, 450);
+    launchAndroidIntent(
+      "intent://send#Intent;package=com.whatsapp;scheme=whatsapp;end",
+      "https://web.whatsapp.com"
+    );
     return true;
   }
 
-  // 3. TELEGRAM
+  // 3. TELEGRAM INTENT
   if (p.includes("telegram")) {
     const reply = "Accessing Telegram comms, Boss.";
     speakVoiceQuick(reply);
     updateUI(reply, "Dispatched: Telegram");
-    setTimeout(() => {
-      window.location.href = "intent:#Intent;package=org.telegram.messenger;scheme=tg;end";
-    }, 450);
+    launchAndroidIntent(
+      "intent:#Intent;package=org.telegram.messenger;scheme=tg;end",
+      "https://web.telegram.org"
+    );
     return true;
   }
 
@@ -286,9 +308,9 @@ function executeSingleAction(p) {
     const reply = "Initializing optical sensors, Boss.";
     speakVoiceQuick(reply);
     updateUI(reply, "Dispatched: Camera");
-    setTimeout(() => {
-      window.location.href = "intent:#Intent;action=android.media.action.IMAGE_CAPTURE;end";
-    }, 450);
+    launchAndroidIntent(
+      "intent:#Intent;action=android.media.action.IMAGE_CAPTURE;end"
+    );
     return true;
   }
 
@@ -297,9 +319,10 @@ function executeSingleAction(p) {
     const reply = "Opening incoming mail relays, Boss.";
     speakVoiceQuick(reply);
     updateUI(reply, "Dispatched: Gmail");
-    setTimeout(() => {
-      window.location.href = "intent:#Intent;package=com.google.android.gm;scheme=googlegmail;end";
-    }, 450);
+    launchAndroidIntent(
+      "intent:#Intent;package=com.google.android.gm;scheme=googlegmail;end",
+      "https://mail.google.com"
+    );
     return true;
   }
 
@@ -345,7 +368,7 @@ function executeSingleAction(p) {
     return true;
   }
 
-  // 10. CALCULATOR CORE
+  // 10. CALCULATOR
   if (p.includes("calculator") || p.includes("calculate") || p.includes("lekkalu") || p.includes("hisab")) {
     const reply = "Deploying math processing matrix, Boss.";
     speakVoiceQuick(reply);
@@ -354,7 +377,7 @@ function executeSingleAction(p) {
     return true;
   }
 
-  // 11. WIKIPEDIA INTEL
+  // 11. WIKIPEDIA
   if (p.startsWith("wiki") || p.startsWith("who is") || p.startsWith("what is")) {
     const topic = p.replace(/^(wiki|who is|what is|tell me about)/gi, "").trim();
     if (topic.length > 2) {
@@ -387,12 +410,10 @@ function executeSingleAction(p) {
       const reply = `Playing ${cleanQuery} on YouTube, Boss.`;
       speakVoiceQuick(reply);
       updateUI(reply, `Launching YouTube: "${cleanQuery}"`);
-      setTimeout(() => {
-        const intent = `intent://www.youtube.com/results?search_query=${encodeURIComponent(cleanQuery)}#Intent;scheme=https;package=com.google.android.youtube;end`;
-        const fallback = `https://www.youtube.com/results?search_query=${encodeURIComponent(cleanQuery)}`;
-        const opened = window.open(intent, "_blank");
-        if (!opened) window.location.href = fallback;
-      }, 500);
+      launchAndroidIntent(
+        `intent://www.youtube.com/results?search_query=${encodeURIComponent(cleanQuery)}#Intent;scheme=https;package=com.google.android.youtube;end`,
+        `https://www.youtube.com/results?search_query=${encodeURIComponent(cleanQuery)}`
+      );
     }
     return true;
   }
@@ -401,7 +422,7 @@ function executeSingleAction(p) {
 }
 
 // -------------------------------------------------------------------------
-// 5-SECOND COMMAND CAPTURE + NEURAL CLOUD DISPATCH
+// 5-SECOND COMMAND CAPTURE + NOISE/SYMBOL FILTERING
 // -------------------------------------------------------------------------
 function resetSilenceTimer() {
   if (speechCaptureTimer) clearTimeout(speechCaptureTimer);
@@ -454,14 +475,17 @@ function startCommandListening() {
     isCommandActive = false;
 
     const finalQuery = collectedTranscript.trim();
-    if (!finalQuery) {
+
+    // FILTER OUT BRACKETS / PUNCTUATION-ONLY SOUNDS LIKE "("
+    const cleaned = finalQuery.replace(/[^a-zA-Z0-9]/g, "").trim();
+    if (cleaned.length < 2) {
       setJarvisVisualState("IDLE");
-      updateUI("Ready for command, Boss.", "No voice detected.");
+      updateUI("Ready for command, Boss.", "Ignored stray sound.");
       resumeWakeEngine();
       return;
     }
 
-    // 1. Check local actions (Instagram, WhatsApp, YouTube, Battery, Time)
+    // 1. Check local native intents first
     const handled = executeSingleAction(finalQuery.toLowerCase());
     if (handled) {
       setJarvisVisualState("IDLE");
@@ -469,7 +493,7 @@ function startCommandListening() {
       return;
     }
 
-    // 2. Fallback to Cloud Neural Brain with History
+    // 2. Dispatch to Cloud AI Brain with Memory
     setJarvisVisualState("THINKING");
     playFuturisticChime("PROCESSING");
 
@@ -565,6 +589,12 @@ function initWakeWordEngine() {
 }
 
 async function handleDirectCommand(prompt) {
+  const cleaned = prompt.replace(/[^a-zA-Z0-9]/g, "").trim();
+  if (cleaned.length < 2) {
+    resumeWakeEngine();
+    return;
+  }
+
   updateUI(`"${prompt}"`, `Direct Prompt: "${prompt}"`);
   
   const wasHandled = executeSingleAction(prompt.toLowerCase());

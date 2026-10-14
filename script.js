@@ -170,20 +170,17 @@ function initGpsSpeedometer() {
   );
 }
 
-// Dispatches alerts autonomously without touching the screen
 async function dispatchAutonomousHighwayTelemetry() {
   playFuturisticChime("PROCESSING");
   if ("vibrate" in navigator) navigator.vibrate([100, 50, 100, 50, 200]);
 
   updateUI("Velocity > 60 KM/H", "Auto-sending highway amenities to Telegram...");
 
-  // 1. Android push notification
   sendLocalSystemNotification(
     "🏎️ J.A.R.V.I.S. Highway Mode",
     `Speed: ${currentSpeedKmh} km/h. Fuel, Tolls, Hospitals sent to Telegram.`
   );
 
-  // 2. Dispatch full amenities radar scan to Telegram
   try {
     await fetch(`${WORKER_ENDPOINT}/api/highway/auto-alert`, {
       method: "POST",

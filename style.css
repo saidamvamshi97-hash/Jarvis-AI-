@@ -1,78 +1,396 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <title>J.A.R.V.I.S Core MK-VIII</title>
-  <meta name="apple-mobile-web-app-capable" content="yes">
-  <meta name="theme-color" content="#020617">
-  <link rel="stylesheet" href="style.css?v=2026_mk8_highway">
-</head>
-<body>
-  <div class="jarvis-container">
-    <header class="top-bar">
-      <div class="telemetry-pill">
-        <span class="pulse-indicator"></span>
-        <span id="sysStatus">COPILOT // MK-VIII</span>
-      </div>
-      <button id="wakeToggleBtn" class="wake-btn" onclick="toggleWakeWord()">
-        <span id="wakeStatusDot" class="dot"></span>
-        <span id="wakeBtnText">Wake Mode: OFF</span>
-      </button>
-    </header>
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
 
-    <!-- Holographic Telemetry Diagnostics Grid with Live Velocity -->
-    <div class="hud-top-telemetry">
-      <div class="stat-block"><span class="stat-label">PWR</span><span id="batteryStat">--%</span></div>
-      <div class="stat-block"><span class="stat-label">SPEED</span><span id="speedStat" style="color: #00ffff; font-weight: bold;">0 KM/H</span></div>
-      <div class="stat-block"><span class="stat-label">MODE</span><span id="modeStat">CRUISE</span></div>
-    </div>
+body {
+  background: #020617;
+  color: #00ffff;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, monospace;
+  height: 100vh;
+  overflow: hidden;
+  user-select: none;
+  -webkit-tap-highlight-color: transparent;
+}
 
-    <main class="core-display">
-      <div id="orbCore" class="orb-container">
-        <div class="radar-sweep"></div>
-        <div class="orb-glow"></div>
-        <div class="orb-outer-reticle"></div>
-        <div class="orb-ring"></div>
-        <div class="orb-inner"></div>
-      </div>
+.jarvis-container {
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  align-items: center;
+  height: 100%;
+  padding: 20px 16px 28px 16px;
+  position: relative;
+  z-index: 1;
+}
 
-      <div class="hud-telemetry">
-        <span id="hzLevelText">000 Hz</span>
-        <div class="hud-signal-bar">
-          <div id="hudSignalFill" class="hud-signal-fill"></div>
-        </div>
-        <span id="dbLevelText">-INF dB</span>
-      </div>
+.jarvis-container::before {
+  content: " ";
+  position: absolute;
+  top: 0; left: 0; width: 100%; height: 100%;
+  background: linear-gradient(rgba(18, 16, 16, 0) 50%, rgba(0, 255, 255, 0.02) 50%), 
+              linear-gradient(90deg, rgba(255, 0, 0, 0.02), rgba(0, 255, 255, 0.01), rgba(0, 0, 255, 0.02));
+  background-size: 100% 3px, 6px 100%;
+  pointer-events: none;
+  z-index: 0;
+}
 
-      <div id="responseBox" class="terminal-box">Ready for command, Boss...</div>
-      <div id="debugBox" class="debug-subtext">GPS Speedometer & Radar Online...</div>
-    </main>
+.top-bar {
+  width: 100%;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  z-index: 2;
+}
 
-    <footer class="bottom-bar">
-      <div class="siri-button-wrapper">
-        <div class="siri-halo-ring"></div>
-        <button id="siriSpeakBtn" class="siri-speak-btn" aria-label="Activate Jarvis">
-          <span class="mic-icon">🎙️</span>
-        </button>
-      </div>
-    </footer>
-  </div>
+.telemetry-pill {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 11px;
+  letter-spacing: 2px;
+  font-weight: 700;
+  padding: 5px 12px;
+  border: 1px solid rgba(0, 255, 255, 0.4);
+  border-radius: 6px;
+  background: rgba(0, 255, 255, 0.05);
+}
 
-  <!-- Universal Modal HUD with Triple-Tap Fullscreen -->
-  <div id="universalAppModal" class="floating-hud-modal">
-    <div class="hud-header">
-      <span id="appHudTitle">SYSTEM APP // ACTIVE</span>
-      <div class="hud-controls">
-        <a id="appPipLink" href="#" target="_blank" class="pip-btn">[OPEN APP]</a>
-        <button class="hud-close-btn" onclick="closeUniversalApp()">✕</button>
-      </div>
-    </div>
-    <div class="hud-body">
-      <iframe id="appHudFrame" src="" allow="autoplay; encrypted-media; picture-in-picture; geolocation" allowfullscreen></iframe>
-    </div>
-  </div>
+.pulse-indicator {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #00ffff;
+  box-shadow: 0 0 8px #00ffff;
+  animation: beacon 1.8s infinite;
+}
 
-  <script src="script.js?v=2026_mk8_highway"></script>
-</body>
-</html>
+.hud-top-telemetry {
+  width: 100%;
+  display: flex;
+  justify-content: space-around;
+  padding: 8px 0;
+  border-bottom: 1px solid rgba(0, 255, 255, 0.15);
+  font-size: 10px;
+  letter-spacing: 1px;
+  z-index: 2;
+}
+
+.stat-block {
+  display: flex;
+  gap: 6px;
+}
+
+.stat-label {
+  color: rgba(0, 255, 255, 0.5);
+}
+
+.wake-btn {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: rgba(0, 255, 255, 0.08);
+  border: 1px solid #00ffff;
+  color: #00ffff;
+  padding: 8px 16px;
+  border-radius: 20px;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+
+.wake-btn.active {
+  background: rgba(0, 255, 119, 0.2);
+  border-color: #00ff77;
+  color: #00ff77;
+  box-shadow: 0 0 16px rgba(0, 255, 119, 0.5);
+}
+
+.wake-btn .dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background-color: #555;
+}
+
+.wake-btn.active .dot {
+  background-color: #00ff77;
+  box-shadow: 0 0 10px #00ff77;
+}
+
+.core-display {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 16px;
+  z-index: 2;
+}
+
+.orb-container {
+  width: 220px;
+  height: 220px;
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.radar-sweep {
+  position: absolute;
+  width: 210px;
+  height: 210px;
+  border-radius: 50%;
+  border: 1px solid rgba(0, 255, 255, 0.15);
+  background: conic-gradient(from 0deg, rgba(0, 255, 255, 0.18) 0deg, transparent 60deg, transparent 360deg);
+  animation: radarScan 3s linear infinite;
+  display: none;
+}
+
+.orb-container.wake-active .radar-sweep {
+  display: block;
+}
+
+.orb-glow {
+  position: absolute;
+  width: 100%;
+  height: 100%;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(0,255,255,0.4) 0%, rgba(0,255,255,0) 70%);
+  animation: pulse 2.5s infinite ease-in-out;
+}
+
+.orb-ring {
+  position: absolute;
+  width: 150px;
+  height: 150px;
+  border: 2px dashed #00ffff;
+  border-radius: 50%;
+  animation: rotateClockwise 14s linear infinite;
+}
+
+.orb-outer-reticle {
+  position: absolute;
+  width: 180px;
+  height: 180px;
+  border: 1px dotted rgba(0, 255, 255, 0.5);
+  border-radius: 50%;
+  animation: rotateCounter 20s linear infinite;
+}
+
+.orb-inner {
+  width: 80px;
+  height: 80px;
+  border-radius: 50%;
+  background: #00ffff;
+  box-shadow: 0 0 32px #00ffff;
+  transition: transform 0.15s ease, background-color 0.3s ease;
+}
+
+.hud-telemetry {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  font-size: 11px;
+  color: rgba(0, 255, 255, 0.75);
+  letter-spacing: 1.5px;
+}
+
+.hud-signal-bar {
+  width: 80px;
+  height: 4px;
+  background: rgba(0, 255, 255, 0.2);
+  border-radius: 2px;
+  overflow: hidden;
+}
+
+.hud-signal-fill {
+  width: 0%;
+  height: 100%;
+  background: #00ff77;
+  transition: width 0.1s ease;
+}
+
+.terminal-box {
+  max-width: 320px;
+  text-align: center;
+  font-size: 15px;
+  color: #e2f8ff;
+  line-height: 1.5;
+  min-height: 44px;
+}
+
+.debug-subtext {
+  font-size: 11px;
+  color: rgba(0, 255, 255, 0.6);
+  letter-spacing: 0.5px;
+}
+
+.bottom-bar {
+  width: 100%;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  padding-bottom: 8px;
+  z-index: 10;
+}
+
+.siri-button-wrapper {
+  position: relative;
+  width: 84px;
+  height: 84px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.siri-halo-ring {
+  position: absolute;
+  width: 78px;
+  height: 78px;
+  border-radius: 50%;
+  background: conic-gradient(from 180deg at 50% 50%, #00ffff, #0077ff, #ff007f, #00ffff);
+  filter: blur(12px);
+  opacity: 0.35;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  animation: siriSpin 6s linear infinite;
+}
+
+.siri-speak-btn {
+  position: relative;
+  width: 66px;
+  height: 66px;
+  border-radius: 50%;
+  background: radial-gradient(circle at 35% 35%, #1e293b, #030712);
+  border: 1px solid rgba(0, 255, 255, 0.5);
+  box-shadow: inset 0 2px 4px rgba(255, 255, 255, 0.2), 0 8px 24px rgba(0, 0, 0, 0.6);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  outline: none;
+  touch-action: none;
+  transition: transform 0.15s ease, border-color 0.2s ease;
+}
+
+.mic-icon {
+  font-size: 26px;
+  filter: drop-shadow(0 0 6px rgba(0, 255, 255, 0.8));
+  pointer-events: none;
+}
+
+.siri-button-wrapper.active .siri-halo-ring {
+  width: 114px;
+  height: 114px;
+  opacity: 0.95;
+  filter: blur(16px);
+  animation: siriPulse 1s ease-in-out infinite alternate, siriSpin 3s linear infinite;
+}
+
+.siri-button-wrapper.active .siri-speak-btn {
+  transform: scale(0.92);
+  border-color: #00ff77;
+  box-shadow: 0 0 28px rgba(0, 255, 119, 0.7);
+}
+
+/* =========================================================================
+   FLOATING HUD MODAL & FULLSCREEN MODE
+   ========================================================================= */
+.floating-hud-modal {
+  position: fixed;
+  bottom: 84px;
+  left: 4%;
+  width: 92%;
+  height: 250px;
+  background: rgba(2, 6, 23, 0.95);
+  border: 1px solid #00ffff;
+  border-radius: 14px;
+  box-shadow: 0 0 25px rgba(0, 255, 255, 0.35);
+  z-index: 9999;
+  flex-direction: column;
+  overflow: hidden;
+  backdrop-filter: blur(14px);
+  transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.floating-hud-modal.fullscreen-mode {
+  top: 0 !important;
+  left: 0 !important;
+  bottom: 0 !important;
+  width: 100vw !important;
+  height: 100vh !important;
+  border-radius: 0 !important;
+  border: none !important;
+  z-index: 99999 !important;
+}
+
+.floating-hud-modal.fullscreen-mode .hud-body {
+  height: calc(100vh - 42px);
+}
+
+.hud-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 8px 14px;
+  background: rgba(0, 255, 255, 0.12);
+  border-bottom: 1px solid rgba(0, 255, 255, 0.3);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 1.5px;
+  color: #00ffff;
+}
+
+.hud-controls {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.pip-btn {
+  display: none;
+  color: #ff0055;
+  text-decoration: underline;
+  font-size: 10px;
+  font-weight: 700;
+}
+
+.hud-close-btn {
+  background: transparent;
+  border: none;
+  color: #00ffff;
+  font-size: 18px;
+  cursor: pointer;
+}
+
+.hud-body {
+  width: 100%;
+  height: 100%;
+  background: #000;
+}
+
+.floating-hud-modal iframe {
+  width: 100%;
+  height: 100%;
+  border: none;
+}
+
+@keyframes beacon {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.4; transform: scale(0.8); }
+}
+
+@keyframes pulse {
+  0%, 100% { transform: scale(0.92); opacity: 0.6; }
+  50% { transform: scale(1.08); opacity: 0.95; }
+}
+
+@keyframes rotateClockwise { 100% { transform: rotate(360deg); } }
+@keyframes rotateCounter { 100% { transform: rotate(-360deg); } }
+@keyframes radarScan { 100% { transform: rotate(360deg); } }
+@keyframes siriSpin { 100% { transform: rotate(360deg); } }
+@keyframes siriPulse {
+  0% { transform: scale(0.9); opacity: 0.7; }
+  100% { transform: scale(1.25); opacity: 1; }
+}

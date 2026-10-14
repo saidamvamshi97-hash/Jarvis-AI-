@@ -6,7 +6,7 @@
   <title>J.A.R.V.I.S Core MK-VIII</title>
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="theme-color" content="#020617">
-  <link rel="stylesheet" href="style.css?v=2026_mk8_prod">
+  <link rel="stylesheet" href="./style.css">
 </head>
 <body>
   <div class="jarvis-container">
@@ -21,7 +21,7 @@
       </button>
     </header>
 
-    <!-- Holographic Diagnostics Grid with Live Velocity -->
+    <!-- Holographic Telemetry Diagnostics Grid -->
     <div class="hud-top-telemetry">
       <div class="stat-block"><span class="stat-label">PWR</span><span id="batteryStat">--%</span></div>
       <div class="stat-block"><span class="stat-label">SPEED</span><span id="speedStat" style="color: #00ffff; font-weight: bold;">0 KM/H</span></div>
@@ -59,8 +59,8 @@
     </footer>
   </div>
 
-  <!-- Universal Modal HUD with Triple-Tap Fullscreen -->
-  <div id="universalAppModal" class="floating-hud-modal">
+  <!-- Universal Modal HUD with Triple-Tap Fullscreen (Hidden by default) -->
+  <div id="universalAppModal" class="floating-hud-modal" style="display: none;">
     <div class="hud-header">
       <span id="appHudTitle">SYSTEM APP // ACTIVE</span>
       <div class="hud-controls">
@@ -73,6 +73,6 @@
     </div>
   </div>
 
-  <script src="script.js?v=2026_mk8_prod"></script>
+  <script src="./script.js"></script>
 </body>
 </html>

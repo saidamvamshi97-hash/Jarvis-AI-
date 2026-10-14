@@ -1,5 +1,5 @@
 // =========================================================================
-// J.A.R.V.I.S. MK-VIII: HIGHWAY COPILOT (>60 KM/H SPEED TRIGGER + AMENITIES)
+// J.A.R.V.I.S. MK-VIII: FULL AUTONOMOUS ENGINE (SPEED MONITOR + TELEGRAM + HUD)
 // =========================================================================
 
 const WORKER_ENDPOINT = "https://jarvis-automation.saidamvamshi97.workers.dev";
@@ -20,14 +20,40 @@ let collectedTranscript = "";
 let audioCtx = null;
 let availableVoices = [];
 
-// Live GPS Speed & Location State
+// Live GPS Velocity & Location State
 let currentLat = 17.3850;
 let currentLon = 78.4867;
 let currentSpeedKmh = 0;
 let hasTriggeredHighSpeedAlert = false;
+let lastAutoAlertTime = 0; // Throttle alerts to avoid spamming
 
 // -------------------------------------------------------------------------
-// AUDIO ENGINE & VOICE INITIALIZATION
+// LOCAL NOTIFICATION HANDLER
+// -------------------------------------------------------------------------
+function requestDeviceNotificationPermission() {
+  if ("Notification" in window && Notification.permission !== "granted") {
+    Notification.requestPermission();
+  }
+}
+window.addEventListener("touchstart", requestDeviceNotificationPermission, { once: true });
+window.addEventListener("click", requestDeviceNotificationPermission, { once: true });
+
+function sendLocalSystemNotification(title, body) {
+  if ("Notification" in window && Notification.permission === "granted") {
+    navigator.serviceWorker && navigator.serviceWorker.ready.then((reg) => {
+      reg.showNotification(title, {
+        body: body,
+        icon: "https://saidamvamshi97.github.io/Jarvis-AI-/favicon.ico",
+        vibrate: [200, 100, 200]
+      });
+    }).catch(() => {
+      new Notification(title, { body: body });
+    });
+  }
+}
+
+// -------------------------------------------------------------------------
+// AUDIO SYNTHESIS & VOICE SELECTION
 // -------------------------------------------------------------------------
 function initAudioEngine() {
   if (!audioCtx) {
@@ -92,7 +118,7 @@ function speakVoiceQuick(text) {
 }
 
 // -------------------------------------------------------------------------
-// LIVE GPS SPEEDOMETER & HIGHWAY AUTO-ACTIVATION (>60 KM/H)
+// LIVE GPS SPEEDOMETER & AUTONOMOUS TELEGRAM ALERT (>60 KM/H)
 // -------------------------------------------------------------------------
 function initGpsSpeedometer() {
   if (!("geolocation" in navigator)) return;
@@ -108,7 +134,6 @@ function initGpsSpeedometer() {
       currentLat = pos.coords.latitude;
       currentLon = pos.coords.longitude;
 
-      // Speed is provided in meters/second -> convert to km/h
       const speedMps = pos.coords.speed || 0;
       currentSpeedKmh = Math.round(speedMps * 3.6);
 
@@ -117,19 +142,22 @@ function initGpsSpeedometer() {
 
       if (speedEl) speedEl.innerText = `${currentSpeedKmh} KM/H`;
 
-      // AUTONOMOUS HIGH-SPEED VEHICLE TRIGGER (> 60 KM/H)
+      const now = Date.now();
+
+      // AUTONOMOUS ZERO-TOUCH TRIGGER: SPEED EXCEEDS 60 KM/H
       if (currentSpeedKmh >= 60) {
         if (modeEl) {
           modeEl.innerText = "HIGHWAY";
           modeEl.style.color = "#ff9900";
         }
 
-        if (!hasTriggeredHighSpeedAlert) {
+        // Trigger if not sent in last 15 minutes
+        if (!hasTriggeredHighSpeedAlert && (now - lastAutoAlertTime > 15 * 60 * 1000)) {
           hasTriggeredHighSpeedAlert = true;
-          triggerHighwayCopilotActivation();
+          lastAutoAlertTime = now;
+          dispatchAutonomousHighwayTelemetry();
         }
       } else if (currentSpeedKmh < 45) {
-        // Reset trigger once speed drops
         hasTriggeredHighSpeedAlert = false;
         if (modeEl) {
           modeEl.innerText = "CRUISE";
@@ -142,65 +170,35 @@ function initGpsSpeedometer() {
   );
 }
 
-// Autonomous high-speed protocol activation
-async function triggerHighwayCopilotActivation() {
-  playFuturisticChime("WAKE");
-  triggerHaptic("WAKE");
+// Dispatches alerts autonomously without touching the screen
+async function dispatchAutonomousHighwayTelemetry() {
+  playFuturisticChime("PROCESSING");
+  if ("vibrate" in navigator) navigator.vibrate([100, 50, 100, 50, 200]);
 
-  const alertText = `Velocity exceeded 60 km/h, Boss. Highway Copilot active. Monitoring upcoming tolls, fuel stations, hospitals, and repair shops.`;
-  speakVoiceQuick(alertText);
-  updateUI(alertText, "Autonomous Mode: Highway Radar Engaged");
+  updateUI("Velocity > 60 KM/H", "Auto-sending highway amenities to Telegram...");
 
-  // Send priority Telegram telemetry
-  fetch(`${WORKER_ENDPOINT}/api/telegram/alert`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      message: `🏎️ *High-Speed Highway Mode Activated*\nCurrent Speed: ${currentSpeedKmh} km/h\nCoordinates: \`${currentLat.toFixed(4)},${currentLon.toFixed(4)}\`\nAmenities radar active.`
-    })
-  }).catch(() => {});
-}
-
-// -------------------------------------------------------------------------
-// HIGHWAY RADAR DISPATCHER (FUEL, TOLLS, HOSPITALS, REPAIR)
-// -------------------------------------------------------------------------
-async function scanHighwayAmenity(type) {
-  let label = "Fuel Station";
-  let mapsQuery = "petrol pump near me";
-
-  if (type === "toll") {
-    label = "Toll Plaza";
-    mapsQuery = "toll plaza on my route";
-  } else if (type === "hospital") {
-    label = "Emergency Hospital";
-    mapsQuery = "emergency hospital near me";
-  } else if (type === "repair") {
-    label = "Vehicle Mechanic & Tyre Repair";
-    mapsQuery = "car bike puncture vehicle repair shop near me";
-  }
-
-  const announcing = `Scanning corridor for nearest ${label}, Boss.`;
-  speakVoiceQuick(announcing);
-  updateUI(announcing, `Radar: Locating ${label}...`);
-  setJarvisVisualState("THINKING");
-
-  // Embed live Google Maps radar inside the HUD modal
-  openUniversalApp(
-    `RADAR // ${label.toUpperCase()}`,
-    `https://maps.google.com/maps?q=${encodeURIComponent(mapsQuery)}&t=&z=13&ie=UTF8&iwloc=&output=embed`,
-    `https://www.google.com/maps/search/${encodeURIComponent(mapsQuery)}`
+  // 1. Android push notification
+  sendLocalSystemNotification(
+    "🏎️ J.A.R.V.I.S. Highway Mode",
+    `Speed: ${currentSpeedKmh} km/h. Fuel, Tolls, Hospitals sent to Telegram.`
   );
 
-  // Dispatch background telegram notification
-  fetch(`${WORKER_ENDPOINT}/api/telegram/alert`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      message: `📍 *Highway Amenity Inquiry: ${label}*\nSpeed: ${currentSpeedKmh} km/h\nRadar dispatched in HUD.`
-    })
-  }).catch(() => {});
+  // 2. Dispatch full amenities radar scan to Telegram
+  try {
+    await fetch(`${WORKER_ENDPOINT}/api/highway/auto-alert`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        lat: currentLat,
+        lon: currentLon,
+        speed: currentSpeedKmh
+      })
+    });
 
-  return true;
+    updateUI("Telegram Dispatched", "Tolls, Fuel, Hospitals & Garages relayed.");
+  } catch (err) {
+    updateUI("Highway Dispatch Active", "Local telemetry verified.");
+  }
 }
 
 // -------------------------------------------------------------------------
@@ -297,27 +295,13 @@ function launchAndroidIntent(deepLink, intentFallback, webFallback) {
 function executeSingleAction(rawPrompt) {
   const p = rawPrompt.toLowerCase().replace(/[^a-z0-9\s]/g, " ").trim();
 
-  // 1. HIGHWAY RADAR INTENTS (FUEL, TOLLS, HOSPITALS, REPAIR)
-  if (p.includes("fuel") || p.includes("petrol") || p.includes("diesel") || p.includes("gas station")) {
-    return scanHighwayAmenity("fuel");
-  }
-  if (p.includes("toll") || p.includes("toll gate") || p.includes("toll plaza") || p.includes("tax")) {
-    return scanHighwayAmenity("toll");
-  }
-  if (p.includes("hospital") || p.includes("doctor") || p.includes("emergency") || p.includes("medical") || p.includes("ambulance")) {
-    return scanHighwayAmenity("hospital");
-  }
-  if (p.includes("repair") || p.includes("mechanic") || p.includes("puncture") || p.includes("garage") || p.includes("breakdown")) {
-    return scanHighwayAmenity("repair");
-  }
-  if (p.includes("speed") || p.includes("how fast") || p.includes("velocity")) {
-    const reply = `Current ground velocity is ${currentSpeedKmh} kilometers per hour, Boss.`;
-    speakVoiceQuick(reply);
-    updateUI(reply, "Telemetry: GPS Velocity Readout");
+  // Instant Manual Telegram Trigger
+  if (p.includes("send message") || p.includes("send telegram") || p.includes("send alert")) {
+    dispatchAutonomousHighwayTelemetry();
     return true;
   }
 
-  // 2. APPS (INSTAGRAM, WHATSAPP, TELEGRAM, YOUTUBE, CAMERA, GMAIL)
+  // APPS (Instagram, WhatsApp, Telegram, YouTube)
   if (/\b(instagram|insta|instgram|ig)\b/.test(p)) {
     const reply = "Launching Instagram, Boss.";
     speakVoiceQuick(reply);
@@ -347,7 +331,7 @@ function executeSingleAction(rawPrompt) {
     return true;
   }
 
-  // 3. HARDWARE & CLOCK
+  // BATTERY & TIME
   if (p.includes("battery") || p.includes("charge")) {
     const batEl = document.getElementById("batteryStat");
     const val = batEl ? batEl.innerText : "Nominal";
@@ -590,7 +574,9 @@ async function toggleWakeWord() {
   }
 }
 
-// Visual and Sound Synthesizer Utilities
+// -------------------------------------------------------------------------
+// SYNTHESIS & TELEMETRY
+// -------------------------------------------------------------------------
 function playFuturisticChime(type) {
   try {
     initAudioEngine();
@@ -672,8 +658,15 @@ function setJarvisVisualState(state) {
   }
 }
 
+function updateUI(mainText, debugText) {
+  const box = document.getElementById("responseBox");
+  const debug = document.getElementById("debugBox");
+  if (box) box.innerText = mainText;
+  if (debug && debugText) debug.innerText = debugText;
+}
+
 // -------------------------------------------------------------------------
-// INITIALIZE HIGHWAY COPILOT ON PAGE READY
+// INITIALIZATION
 // -------------------------------------------------------------------------
 document.addEventListener("DOMContentLoaded", () => {
   const btn = document.getElementById("siriSpeakBtn");

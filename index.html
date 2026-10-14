@@ -3,17 +3,17 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <title>J.A.R.V.I.S Core MK-VII</title>
+  <title>J.A.R.V.I.S Core MK-VIII</title>
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="theme-color" content="#020617">
-  <link rel="stylesheet" href="style.css?v=2026_mk7_hud">
+  <link rel="stylesheet" href="style.css?v=2026_mk8_prod">
 </head>
 <body>
   <div class="jarvis-container">
     <header class="top-bar">
       <div class="telemetry-pill">
         <span class="pulse-indicator"></span>
-        <span id="sysStatus">CORE // MK-VII ONLINE</span>
+        <span id="sysStatus">COPILOT // MK-VIII</span>
       </div>
       <button id="wakeToggleBtn" class="wake-btn" onclick="toggleWakeWord()">
         <span id="wakeStatusDot" class="dot"></span>
@@ -21,11 +21,11 @@
       </button>
     </header>
 
-    <!-- Holographic Telemetry Diagnostics Grid -->
+    <!-- Holographic Diagnostics Grid with Live Velocity -->
     <div class="hud-top-telemetry">
       <div class="stat-block"><span class="stat-label">PWR</span><span id="batteryStat">--%</span></div>
-      <div class="stat-block"><span class="stat-label">LINK</span><span id="networkStat">ONLINE</span></div>
-      <div class="stat-block"><span class="stat-label">COGNITION</span><span id="engineStat">DUAL-TIER</span></div>
+      <div class="stat-block"><span class="stat-label">SPEED</span><span id="speedStat" style="color: #00ffff; font-weight: bold;">0 KM/H</span></div>
+      <div class="stat-block"><span class="stat-label">MODE</span><span id="modeStat">CRUISE</span></div>
     </div>
 
     <main class="core-display">
@@ -46,21 +46,20 @@
       </div>
 
       <div id="responseBox" class="terminal-box">Ready for command, Boss...</div>
-      <div id="debugBox" class="debug-subtext">Standing by for voice input...</div>
+      <div id="debugBox" class="debug-subtext">GPS Speedometer & Radar Online...</div>
     </main>
 
     <footer class="bottom-bar">
       <div class="siri-button-wrapper">
         <div class="siri-halo-ring"></div>
         <button id="siriSpeakBtn" class="siri-speak-btn" aria-label="Activate Jarvis">
-          <div class="siri-core-wave"></div>
           <span class="mic-icon">🎙️</span>
         </button>
       </div>
     </footer>
   </div>
 
-  <!-- Universal Modal HUD -->
+  <!-- Universal Modal HUD with Triple-Tap Fullscreen -->
   <div id="universalAppModal" class="floating-hud-modal">
     <div class="hud-header">
       <span id="appHudTitle">SYSTEM APP // ACTIVE</span>
@@ -74,6 +73,6 @@
     </div>
   </div>
 
-  <script src="script.js?v=2026_mk7_hud"></script>
+  <script src="script.js?v=2026_mk8_prod"></script>
 </body>
 </html>

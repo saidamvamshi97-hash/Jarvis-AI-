@@ -1,78 +1,491 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <title>J.A.R.V.I.S Core MK-VIII</title>
-  <meta name="apple-mobile-web-app-capable" content="yes">
-  <meta name="theme-color" content="#020617">
-  <link rel="stylesheet" href="./style.css">
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title>J.A.R.V.I.S. MK-VIII</title>
+  <style>
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Courier New", monospace;
+      user-select: none;
+      -webkit-tap-highlight-color: transparent;
+    }
+
+    body {
+      background: radial-gradient(circle at center, #071524 0%, #02070e 100%);
+      color: #00f2fe;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      align-items: center;
+      padding: 24px 16px;
+      overflow: hidden;
+    }
+
+    /* Top HUD Header */
+    .hud-header {
+      width: 100%;
+      max-width: 480px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .hud-badge {
+      border: 1px solid rgba(0, 242, 254, 0.4);
+      background: rgba(0, 242, 254, 0.05);
+      border-radius: 20px;
+      padding: 6px 14px;
+      font-size: 11px;
+      letter-spacing: 1.5px;
+      text-transform: uppercase;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .badge-dot {
+      width: 6px;
+      height: 6px;
+      background: #00f2fe;
+      border-radius: 50%;
+      box-shadow: 0 0 8px #00f2fe;
+      animation: pulseDot 2s infinite;
+    }
+
+    @keyframes pulseDot {
+      0%, 100% { opacity: 1; transform: scale(1); }
+      50% { opacity: 0.3; transform: scale(0.8); }
+    }
+
+    /* Telemetry stats */
+    .telemetry-row {
+      width: 100%;
+      max-width: 440px;
+      display: flex;
+      justify-content: space-around;
+      border-top: 1px solid rgba(0, 242, 254, 0.15);
+      border-bottom: 1px solid rgba(0, 242, 254, 0.15);
+      padding: 10px 0;
+      font-size: 11px;
+      letter-spacing: 1px;
+    }
+
+    .stat-label {
+      color: rgba(0, 242, 254, 0.5);
+      margin-right: 4px;
+    }
+
+    .stat-val {
+      font-weight: 600;
+    }
+
+    /* Center Arc Reactor */
+    .reactor-container {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      margin: auto 0;
+      position: relative;
+    }
+
+    .reactor-ring-outer {
+      width: 220px;
+      height: 220px;
+      border-radius: 50%;
+      border: 2px dashed rgba(0, 242, 254, 0.4);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      animation: rotateRing 20s linear infinite;
+    }
+
+    .reactor-ring-inner {
+      width: 170px;
+      height: 170px;
+      border-radius: 50%;
+      border: 1px solid rgba(0, 242, 254, 0.5);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      box-shadow: 0 0 30px rgba(0, 242, 254, 0.2);
+    }
+
+    .reactor-core {
+      width: 110px;
+      height: 110px;
+      border-radius: 50%;
+      background: radial-gradient(circle, #00f2fe 0%, #0088cc 80%);
+      box-shadow: 0 0 50px #00f2fe, 0 0 80px rgba(0, 242, 254, 0.5);
+      transition: transform 0.2s ease, box-shadow 0.2s ease;
+    }
+
+    .reactor-core.listening {
+      animation: pulseCore 1s infinite alternate;
+      box-shadow: 0 0 70px #00f2fe, 0 0 100px #00f2fe;
+    }
+
+    @keyframes rotateRing {
+      from { transform: rotate(0deg); }
+      to { transform: rotate(360deg); }
+    }
+
+    @keyframes pulseCore {
+      from { transform: scale(0.95); opacity: 0.8; }
+      to { transform: scale(1.1); opacity: 1; }
+    }
+
+    /* Frequencies and dB Meter */
+    .meter-display {
+      margin-top: 24px;
+      font-size: 12px;
+      letter-spacing: 1px;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      color: rgba(0, 242, 254, 0.7);
+    }
+
+    .meter-bar {
+      width: 90px;
+      height: 2px;
+      background: rgba(0, 242, 254, 0.4);
+      position: relative;
+    }
+
+    .meter-fill {
+      width: 30%;
+      height: 100%;
+      background: #00f2fe;
+      box-shadow: 0 0 6px #00f2fe;
+      transition: width 0.1s;
+    }
+
+    /* Live Output & Messages */
+    .hud-console {
+      margin-top: 20px;
+      text-align: center;
+      max-width: 400px;
+      min-height: 80px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .primary-msg {
+      font-size: 16px;
+      color: #ffffff;
+      font-weight: 500;
+      letter-spacing: 0.5px;
+      margin-bottom: 8px;
+      line-height: 1.4;
+      text-shadow: 0 0 8px rgba(0, 242, 254, 0.4);
+    }
+
+    .sub-msg {
+      font-size: 12px;
+      color: rgba(0, 242, 254, 0.65);
+      letter-spacing: 1px;
+      min-height: 16px;
+    }
+
+    /* Bottom Microphone Controls */
+    .controls-container {
+      margin-bottom: 10px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+    }
+
+    .mic-button {
+      width: 68px;
+      height: 68px;
+      border-radius: 50%;
+      background: radial-gradient(circle, #082138 0%, #030d17 100%);
+      border: 1.5px solid #00f2fe;
+      box-shadow: 0 0 20px rgba(0, 242, 254, 0.35);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      outline: none;
+      transition: all 0.25s ease;
+    }
+
+    .mic-button:active {
+      transform: scale(0.92);
+    }
+
+    .mic-button.active {
+      border-color: #ff3366;
+      box-shadow: 0 0 30px #ff3366;
+    }
+
+    .mic-button svg {
+      width: 28px;
+      height: 28px;
+      fill: #00f2fe;
+      transition: fill 0.2s;
+    }
+
+    .mic-button.active svg {
+      fill: #ff3366;
+    }
+  </style>
 </head>
 <body>
-  <div class="jarvis-container">
-    <header class="top-bar">
-      <div class="telemetry-pill">
-        <span class="pulse-indicator"></span>
-        <span id="sysStatus">COPILOT // MK-VIII</span>
-      </div>
-      <button id="wakeToggleBtn" class="wake-btn" onclick="toggleWakeWord()">
-        <span id="wakeStatusDot" class="dot"></span>
-        <span id="wakeBtnText">Wake Mode: OFF</span>
-      </button>
-    </header>
 
-    <!-- Holographic Telemetry Diagnostics Grid -->
-    <div class="hud-top-telemetry">
-      <div class="stat-block"><span class="stat-label">PWR</span><span id="batteryStat">--%</span></div>
-      <div class="stat-block"><span class="stat-label">SPEED</span><span id="speedStat" style="color: #00ffff; font-weight: bold;">0 KM/H</span></div>
-      <div class="stat-block"><span class="stat-label">MODE</span><span id="modeStat">CRUISE</span></div>
+  <!-- Top System Status -->
+  <div class="hud-header">
+    <div class="hud-badge">
+      <div class="badge-dot"></div>
+      <span>COPILOT // MK-VIII</span>
     </div>
-
-    <main class="core-display">
-      <div id="orbCore" class="orb-container">
-        <div class="radar-sweep"></div>
-        <div class="orb-glow"></div>
-        <div class="orb-outer-reticle"></div>
-        <div class="orb-ring"></div>
-        <div class="orb-inner"></div>
-      </div>
-
-      <div class="hud-telemetry">
-        <span id="hzLevelText">000 Hz</span>
-        <div class="hud-signal-bar">
-          <div id="hudSignalFill" class="hud-signal-fill"></div>
-        </div>
-        <span id="dbLevelText">-INF dB</span>
-      </div>
-
-      <div id="responseBox" class="terminal-box">Ready for command, Boss...</div>
-      <div id="debugBox" class="debug-subtext">GPS Speedometer & Radar Online...</div>
-    </main>
-
-    <footer class="bottom-bar">
-      <div class="siri-button-wrapper">
-        <div class="siri-halo-ring"></div>
-        <button id="siriSpeakBtn" class="siri-speak-btn" aria-label="Activate Jarvis">
-          <span class="mic-icon">🎙️</span>
-        </button>
-      </div>
-    </footer>
-  </div>
-
-  <!-- Universal Modal HUD with Triple-Tap Fullscreen (Hidden by default) -->
-  <div id="universalAppModal" class="floating-hud-modal" style="display: none;">
-    <div class="hud-header">
-      <span id="appHudTitle">SYSTEM APP // ACTIVE</span>
-      <div class="hud-controls">
-        <a id="appPipLink" href="#" target="_blank" class="pip-btn">[OPEN APP]</a>
-        <button class="hud-close-btn" onclick="closeUniversalApp()">✕</button>
-      </div>
-    </div>
-    <div class="hud-body">
-      <iframe id="appHudFrame" src="" allow="autoplay; encrypted-media; picture-in-picture; geolocation" allowfullscreen></iframe>
+    <div class="hud-badge" id="wakeBadge">
+      <div class="badge-dot" style="background:#555;box-shadow:none;"></div>
+      <span>MIC: READY</span>
     </div>
   </div>
 
-  <script src="./script.js"></script>
+  <!-- Telemetry Bar -->
+  <div class="telemetry-row">
+    <div><span class="stat-label">PWR</span><span class="stat-val" id="pwrVal">--%</span></div>
+    <div><span class="stat-label">SPEED</span><span class="stat-val" id="speedVal">0 KM/H</span></div>
+    <div><span class="stat-label">MODE</span><span class="stat-val" id="modeVal">CRUISE</span></div>
+  </div>
+
+  <!-- Central Arc Reactor Visualization -->
+  <div class="reactor-container">
+    <div class="reactor-ring-outer">
+      <div class="reactor-ring-inner">
+        <div class="reactor-core" id="reactorCore"></div>
+      </div>
+    </div>
+
+    <div class="meter-display">
+      <span id="hzVal">000 Hz</span>
+      <div class="meter-bar"><div class="meter-fill" id="meterFill"></div></div>
+      <span id="dbVal">-INF dB</span>
+    </div>
+
+    <!-- Live Terminal Status -->
+    <div class="hud-console">
+      <div class="primary-msg" id="primaryMsg">Ready for command, Boss.</div>
+      <div class="sub-msg" id="subMsg">Tap microphone to initiate voice query</div>
+    </div>
+  </div>
+
+  <!-- Voice Trigger Control -->
+  <div class="controls-container">
+    <button class="mic-button" id="micBtn" aria-label="Microphone">
+      <svg viewBox="0 0 24 24">
+        <path d="M12 14c1.66 0 3-1.34 3-3V5c0-1.66-1.34-3-3-3S9 3.34 9 5v6c0 1.66 1.34 3 3 3z"/>
+        <path d="M17 11c0 2.76-2.24 5-5 5s-5-2.24-5-5H5c0 3.53 2.61 6.43 6 6.92V21h2v-3.08c3.39-.49 6-3.39 6-6.92h-2z"/>
+      </svg>
+    </button>
+  </div>
+
+  <script>
+    // Pointed directly to your active Cloudflare Worker
+    const WORKER_URL = "https://jarvis-automation.saidamvamshi97.workers.dev";
+
+    const micBtn = document.getElementById("micBtn");
+    const reactorCore = document.getElementById("reactorCore");
+    const primaryMsg = document.getElementById("primaryMsg");
+    const subMsg = document.getElementById("subMsg");
+    const speedVal = document.getElementById("speedVal");
+    const modeVal = document.getElementById("modeVal");
+    const pwrVal = document.getElementById("pwrVal");
+    const meterFill = document.getElementById("meterFill");
+    const dbVal = document.getElementById("dbVal");
+    const hzVal = document.getElementById("hzVal");
+
+    let isListening = false;
+    let recognition = null;
+    let currentSpeed = 0;
+    let highwayAlertFired = false;
+
+    // Check battery if supported
+    if (navigator.getBattery) {
+      navigator.getBattery().then(b => {
+        pwrVal.innerText = `${Math.round(b.level * 100)}%`;
+      });
+    }
+
+    // Geolocation Speed & Autonomous Highway Trigger
+    if ("geolocation" in navigator) {
+      navigator.geolocation.watchPosition(
+        (pos) => {
+          const speedKmh = pos.coords.speed ? Math.round(pos.coords.speed * 3.6) : 0;
+          currentSpeed = speedKmh;
+          speedVal.innerText = `${speedKmh} KM/H`;
+
+          if (speedKmh > 60) {
+            modeVal.innerText = "HIGHWAY";
+            modeVal.style.color = "#ff3366";
+            if (!highwayAlertFired) {
+              highwayAlertFired = true;
+              fetch(`${WORKER_URL}/api/highway/auto-alert`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                  lat: pos.coords.latitude,
+                  lon: pos.coords.longitude,
+                  speed: speedKmh
+                })
+              }).catch(() => {});
+            }
+          } else {
+            modeVal.innerText = "CRUISE";
+            modeVal.style.color = "#00f2fe";
+            if (speedKmh < 30) highwayAlertFired = false;
+          }
+        },
+        () => {},
+        { enableHighAccuracy: true }
+      );
+    }
+
+    // Initialize Web Speech API
+    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+
+    if (SpeechRecognition) {
+      recognition = new SpeechRecognition();
+      recognition.continuous = false;
+      recognition.interimResults = false;
+      recognition.lang = "en-IN"; // Set to Indian English for accurate native speech recognition
+
+      recognition.onstart = () => {
+        isListening = true;
+        micBtn.classList.add("active");
+        reactorCore.classList.add("listening");
+        primaryMsg.innerText = "Listening...";
+        subMsg.innerText = "Speak now...";
+        meterFill.style.width = "75%";
+        dbVal.innerText = "-24 dB";
+        hzVal.innerText = "440 Hz";
+      };
+
+      // Completely removed the "Ignored stray sound" rejection filter
+      recognition.onresult = async (event) => {
+        const transcript = event.results[0][0].transcript.trim();
+
+        if (!transcript) {
+          primaryMsg.innerText = "Ready for command, Boss.";
+          subMsg.innerText = "No voice detected. Tap to try again.";
+          return;
+        }
+
+        primaryMsg.innerText = `"${transcript}"`;
+        subMsg.innerText = "Consulting J.A.R.V.I.S brain...";
+
+        // Handle direct command: "Send alert"
+        if (transcript.toLowerCase().includes("send alert") || transcript.toLowerCase().includes("alert")) {
+          primaryMsg.innerText = "Transmitting alert to Telegram...";
+          subMsg.innerText = "Sending highway telemetry packet";
+
+          try {
+            await fetch(`${WORKER_URL}/api/telegram/alert`, {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                message: `🚨 *Manual J.A.R.V.I.S Trigger*\nBoss requested telemetry dispatch.\nVelocity: ${currentSpeed} km/h.`
+              })
+            });
+            speak("Telemetry alert dispatched to your Telegram, Boss.");
+            primaryMsg.innerText = "Alert dispatched successfully, Boss.";
+            subMsg.innerText = "Telegram notification sent";
+          } catch (e) {
+            primaryMsg.innerText = "Failed to dispatch alert.";
+            subMsg.innerText = e.message;
+          }
+          return;
+        }
+
+        // Send all regular queries directly to Groq AI in Worker
+        try {
+          const res = await fetch(`${WORKER_URL}/api/ask`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ prompt: transcript })
+          });
+
+          const data = await res.json();
+          const reply = data.reply || "Systems fully functional, Boss.";
+
+          primaryMsg.innerText = reply;
+          subMsg.innerText = "Cloud AI Answered";
+          speak(reply);
+        } catch (err) {
+          primaryMsg.innerText = "Cloud relay connection issue.";
+          subMsg.innerText = err.message;
+          speak("Link fault encountered, Boss.");
+        }
+      };
+
+      recognition.onerror = (e) => {
+        isListening = false;
+        micBtn.classList.remove("active");
+        reactorCore.classList.remove("listening");
+        meterFill.style.width = "10%";
+        dbVal.innerText = "-INF dB";
+        hzVal.innerText = "000 Hz";
+
+        if (e.error === "no-speech") {
+          primaryMsg.innerText = "No speech detected, Boss.";
+          subMsg.innerText = "Tap the mic and speak clearly.";
+        } else {
+          primaryMsg.innerText = "Microphone paused.";
+          subMsg.innerText = `Error: ${e.error}`;
+        }
+      };
+
+      recognition.onend = () => {
+        isListening = false;
+        micBtn.classList.remove("active");
+        reactorCore.classList.remove("listening");
+        meterFill.style.width = "20%";
+        dbVal.innerText = "-INF dB";
+      };
+    } else {
+      primaryMsg.innerText = "Speech API Not Supported";
+      subMsg.innerText = "Please open this page in Google Chrome";
+    }
+
+    // Toggle Mic Button
+    micBtn.addEventListener("click", () => {
+      if (!recognition) return;
+      if (isListening) {
+        recognition.stop();
+      } else {
+        try {
+          recognition.start();
+        } catch (e) {
+          recognition.stop();
+        }
+      }
+    });
+
+    // Text to Speech
+    function speak(text) {
+      if (!window.speechSynthesis) return;
+      window.speechSynthesis.cancel();
+      const utterance = new SpeechSynthesisUtterance(text);
+      utterance.rate = 1.05;
+      utterance.pitch = 0.95;
+      
+      const voices = window.speechSynthesis.getVoices();
+      const engVoice = voices.find(v => v.lang.includes("en-IN") || v.name.includes("India")) || voices.find(v => v.lang.includes("en"));
+      if (engVoice) utterance.voice = engVoice;
+
+      window.speechSynthesis.speak(utterance);
+    }
+  </script>
 </body>
 </html>

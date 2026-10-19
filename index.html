@@ -306,7 +306,7 @@
     let manualTrainMode = false;
     let transitAlertFired = false;
 
-    // 1. Screen Wake Lock (Prevents Android from sleeping and stopping GPS)
+    // 1. Screen Wake Lock (Prevents sleep in background)
     async function requestWakeLock() {
       try {
         if ("wakeLock" in navigator) {
@@ -325,14 +325,14 @@
       if (document.visibilityState === "visible") requestWakeLock();
     });
 
-    // 2. Battery Status
+    // 2. Battery Meter
     if (navigator.getBattery) {
       navigator.getBattery().then(b => {
         pwrVal.innerText = `${Math.round(b.level * 100)}%`;
       });
     }
 
-    // 3. Haversine Distance & Velocity Calculation
+    // 3. Haversine Distance & Velocity
     function calculateSpeed(lat1, lon1, lat2, lon2, seconds) {
       const R = 6371e3;
       const φ1 = lat1 * Math.PI / 180;
@@ -387,6 +387,7 @@
               fetch(`${WORKER_URL}${endpoint}`, {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
+                keepalive: true,
                 body: JSON.stringify({
                   lat: currentLat,
                   lon: currentLon,
@@ -452,6 +453,7 @@
             fetch(`${WORKER_URL}/api/train/auto-radar`, {
               method: "POST",
               headers: { "Content-Type": "application/json" },
+              keepalive: true,
               body: JSON.stringify({ lat: currentLat, lon: currentLon, speed: currentSpeed })
             }).catch(() => {});
           }
@@ -467,6 +469,7 @@
             await fetch(`${WORKER_URL}/api/telegram/alert`, {
               method: "POST",
               headers: { "Content-Type": "application/json" },
+              keepalive: true,
               body: JSON.stringify({
                 message: `🚨 *Manual J.A.R.V.I.S Alert*\nStatus: ${modeVal.innerText} Mode\nVelocity:${currentSpeed} km/h\nLocation: \`${currentLat}, ${currentLon}\``
               })
@@ -479,7 +482,7 @@
           return;
         }
 
-        // Route all general queries through Groq
+        // Route all general queries to Worker
         try {
           const res = await fetch(`${WORKER_URL}/api/ask`, {
             method: "POST",
@@ -491,7 +494,7 @@
           const reply = data.reply || "Systems fully functional, Boss.";
 
           primaryMsg.innerText = reply;
-          subMsg.innerText = "Groq LLaMA Engine";
+          subMsg.innerText = "AI Online";
           speak(reply);
         } catch (err) {
           primaryMsg.innerText = "Cloud connection issue.";

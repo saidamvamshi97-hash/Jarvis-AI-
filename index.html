@@ -26,7 +26,6 @@
       overflow: hidden;
     }
 
-    /* Top HUD Header */
     .hud-header {
       width: 100%;
       max-width: 480px;
@@ -62,7 +61,6 @@
       50% { opacity: 0.3; transform: scale(0.8); }
     }
 
-    /* Telemetry stats */
     .telemetry-row {
       width: 100%;
       max-width: 440px;
@@ -84,7 +82,6 @@
       font-weight: 600;
     }
 
-    /* Center Arc Reactor */
     .reactor-container {
       display: flex;
       flex-direction: column;
@@ -140,7 +137,6 @@
       to { transform: scale(1.1); opacity: 1; }
     }
 
-    /* Frequencies and dB Meter */
     .meter-display {
       margin-top: 24px;
       font-size: 12px;
@@ -166,7 +162,6 @@
       transition: width 0.1s;
     }
 
-    /* Live Output & Messages */
     .hud-console {
       margin-top: 20px;
       text-align: center;
@@ -195,7 +190,6 @@
       min-height: 16px;
     }
 
-    /* Bottom Microphone Controls */
     .controls-container {
       margin-bottom: 10px;
       display: flex;
@@ -241,26 +235,23 @@
 </head>
 <body>
 
-  <!-- Top System Status -->
   <div class="hud-header">
     <div class="hud-badge">
       <div class="badge-dot"></div>
-      <span>COPILOT // MK-VIII</span>
+      <span id="systemModeTag">COPILOT // MK-VIII</span>
     </div>
     <div class="hud-badge" id="wakeBadge">
-      <div class="badge-dot" style="background:#555;box-shadow:none;"></div>
-      <span>MIC: READY</span>
+      <div class="badge-dot" id="wakeDot" style="background:#00f2fe;"></div>
+      <span id="wakeStatus">LOCK: ON</span>
     </div>
   </div>
 
-  <!-- Telemetry Bar -->
   <div class="telemetry-row">
     <div><span class="stat-label">PWR</span><span class="stat-val" id="pwrVal">--%</span></div>
     <div><span class="stat-label">SPEED</span><span class="stat-val" id="speedVal">0 KM/H</span></div>
     <div><span class="stat-label">MODE</span><span class="stat-val" id="modeVal">CRUISE</span></div>
   </div>
 
-  <!-- Central Arc Reactor Visualization -->
   <div class="reactor-container">
     <div class="reactor-ring-outer">
       <div class="reactor-ring-inner">
@@ -274,14 +265,12 @@
       <span id="dbVal">-INF dB</span>
     </div>
 
-    <!-- Live Terminal Status -->
     <div class="hud-console">
       <div class="primary-msg" id="primaryMsg">Ready for command, Boss.</div>
       <div class="sub-msg" id="subMsg">Tap microphone to initiate voice query</div>
     </div>
   </div>
 
-  <!-- Voice Trigger Control -->
   <div class="controls-container">
     <button class="mic-button" id="micBtn" aria-label="Microphone">
       <svg viewBox="0 0 24 24">
@@ -292,7 +281,6 @@
   </div>
 
   <script>
-    // Pointed directly to your active Cloudflare Worker
     const WORKER_URL = "https://jarvis-automation.saidamvamshi97.workers.dev";
 
     const micBtn = document.getElementById("micBtn");
@@ -305,61 +293,126 @@
     const meterFill = document.getElementById("meterFill");
     const dbVal = document.getElementById("dbVal");
     const hzVal = document.getElementById("hzVal");
+    const wakeStatus = document.getElementById("wakeStatus");
 
     let isListening = false;
     let recognition = null;
     let currentSpeed = 0;
-    let highwayAlertFired = false;
+    let currentLat = null;
+    let currentLon = null;
+    let lastLat = null;
+    let lastLon = null;
+    let lastTime = null;
+    let manualTrainMode = false;
+    let transitAlertFired = false;
 
-    // Check battery if supported
+    // 1. Screen Wake Lock (Prevents Android from sleeping and stopping GPS)
+    async function requestWakeLock() {
+      try {
+        if ("wakeLock" in navigator) {
+          const lock = await navigator.wakeLock.request("screen");
+          wakeStatus.innerText = "LOCK: ON";
+          lock.addEventListener("release", () => {
+            wakeStatus.innerText = "LOCK: REL";
+          });
+        }
+      } catch (e) {
+        wakeStatus.innerText = "LOCK: N/A";
+      }
+    }
+    requestWakeLock();
+    document.addEventListener("visibilitychange", () => {
+      if (document.visibilityState === "visible") requestWakeLock();
+    });
+
+    // 2. Battery Status
     if (navigator.getBattery) {
       navigator.getBattery().then(b => {
         pwrVal.innerText = `${Math.round(b.level * 100)}%`;
       });
     }
 
-    // Geolocation Speed & Autonomous Highway Trigger
+    // 3. Haversine Distance & Velocity Calculation
+    function calculateSpeed(lat1, lon1, lat2, lon2, seconds) {
+      const R = 6371e3;
+      const φ1 = lat1 * Math.PI / 180;
+      const φ2 = lat2 * Math.PI / 180;
+      const Δφ = (lat2 - lat1) * Math.PI / 180;
+      const Δλ = (lon2 - lon1) * Math.PI / 180;
+      const a = Math.sin(Δφ / 2) * Math.sin(Δφ / 2) +
+                Math.cos(φ1) * Math.cos(φ2) *
+                Math.sin(Δλ / 2) * Math.sin(Δλ / 2);
+      const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+      return ((R * c) / seconds) * 3.6;
+    }
+
+    // 4. Geolocation Watcher
     if ("geolocation" in navigator) {
       navigator.geolocation.watchPosition(
         (pos) => {
-          const speedKmh = pos.coords.speed ? Math.round(pos.coords.speed * 3.6) : 0;
-          currentSpeed = speedKmh;
-          speedVal.innerText = `${speedKmh} KM/H`;
+          const now = Date.now();
+          currentLat = pos.coords.latitude;
+          currentLon = pos.coords.longitude;
+          let calculatedSpeed = 0;
 
-          if (speedKmh > 60) {
-            modeVal.innerText = "HIGHWAY";
-            modeVal.style.color = "#ff3366";
-            if (!highwayAlertFired) {
-              highwayAlertFired = true;
-              fetch(`${WORKER_URL}/api/highway/auto-alert`, {
+          if (pos.coords.speed !== null && !isNaN(pos.coords.speed) && pos.coords.speed > 0) {
+            calculatedSpeed = Math.round(pos.coords.speed * 3.6);
+          } else if (lastLat !== null && lastTime !== null) {
+            const timeDiff = (now - lastTime) / 1000;
+            if (timeDiff >= 1.5) {
+              calculatedSpeed = Math.round(calculateSpeed(lastLat, lastLon, currentLat, currentLon, timeDiff));
+            }
+          }
+
+          lastLat = currentLat;
+          lastLon = currentLon;
+          lastTime = now;
+
+          currentSpeed = calculatedSpeed;
+          speedVal.innerText = `${calculatedSpeed} KM/H`;
+
+          // Mode Trigger: Train vs Highway
+          if (manualTrainMode || calculatedSpeed >= 50) {
+            if (manualTrainMode) {
+              modeVal.innerText = "TRAIN";
+              modeVal.style.color = "#00f2fe";
+            } else if (calculatedSpeed >= 60) {
+              modeVal.innerText = "HIGHWAY";
+              modeVal.style.color = "#ff3366";
+            }
+
+            if (!transitAlertFired && calculatedSpeed >= 50) {
+              transitAlertFired = true;
+              const endpoint = manualTrainMode ? "/api/train/auto-radar" : "/api/highway/auto-alert";
+              fetch(`${WORKER_URL}${endpoint}`, {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({
-                  lat: pos.coords.latitude,
-                  lon: pos.coords.longitude,
-                  speed: speedKmh
+                  lat: currentLat,
+                  lon: currentLon,
+                  speed: calculatedSpeed
                 })
               }).catch(() => {});
             }
           } else {
             modeVal.innerText = "CRUISE";
             modeVal.style.color = "#00f2fe";
-            if (speedKmh < 30) highwayAlertFired = false;
+            if (calculatedSpeed < 30) transitAlertFired = false;
           }
         },
         () => {},
-        { enableHighAccuracy: true }
+        { enableHighAccuracy: true, maximumAge: 1000, timeout: 6000 }
       );
     }
 
-    // Initialize Web Speech API
+    // 5. Speech Recognition
     const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
 
     if (SpeechRecognition) {
       recognition = new SpeechRecognition();
       recognition.continuous = false;
       recognition.interimResults = false;
-      recognition.lang = "en-IN"; // Set to Indian English for accurate native speech recognition
+      recognition.lang = "en-IN";
 
       recognition.onstart = () => {
         isListening = true;
@@ -372,7 +425,6 @@
         hzVal.innerText = "440 Hz";
       };
 
-      // Completely removed the "Ignored stray sound" rejection filter
       recognition.onresult = async (event) => {
         const transcript = event.results[0][0].transcript.trim();
 
@@ -385,30 +437,49 @@
         primaryMsg.innerText = `"${transcript}"`;
         subMsg.innerText = "Consulting J.A.R.V.I.S brain...";
 
-        // Handle direct command: "Send alert"
-        if (transcript.toLowerCase().includes("send alert") || transcript.toLowerCase().includes("alert")) {
-          primaryMsg.innerText = "Transmitting alert to Telegram...";
-          subMsg.innerText = "Sending highway telemetry packet";
+        const lower = transcript.toLowerCase();
+
+        // Voice Command: Activate Train Mode
+        if (lower.includes("train mode") || lower.includes("i am on train") || lower.includes("on a train")) {
+          manualTrainMode = true;
+          modeVal.innerText = "TRAIN";
+          modeVal.style.color = "#00f2fe";
+          speak("Train navigation mode engaged, Boss. Telemetry tracking active.");
+          primaryMsg.innerText = "Train Navigation Mode: ACTIVE";
+          subMsg.innerText = "Railway corridor telemetry enabled";
+
+          if (currentLat && currentLon) {
+            fetch(`${WORKER_URL}/api/train/auto-radar`, {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ lat: currentLat, lon: currentLon, speed: currentSpeed })
+            }).catch(() => {});
+          }
+          return;
+        }
+
+        // Voice Command: Manual Alert
+        if (lower.includes("send alert") || lower.includes("alert")) {
+          primaryMsg.innerText = "Transmitting alert...";
+          subMsg.innerText = "Sending Telegram packet";
 
           try {
             await fetch(`${WORKER_URL}/api/telegram/alert`, {
               method: "POST",
               headers: { "Content-Type": "application/json" },
               body: JSON.stringify({
-                message: `🚨 *Manual J.A.R.V.I.S Trigger*\nBoss requested telemetry dispatch.\nVelocity: ${currentSpeed} km/h.`
+                message: `🚨 *Manual J.A.R.V.I.S Alert*\nStatus: ${modeVal.innerText} Mode\nVelocity:${currentSpeed} km/h\nLocation: \`${currentLat}, ${currentLon}\``
               })
             });
-            speak("Telemetry alert dispatched to your Telegram, Boss.");
+            speak("Telemetry dispatched to your Telegram, Boss.");
             primaryMsg.innerText = "Alert dispatched successfully, Boss.";
-            subMsg.innerText = "Telegram notification sent";
           } catch (e) {
             primaryMsg.innerText = "Failed to dispatch alert.";
-            subMsg.innerText = e.message;
           }
           return;
         }
 
-        // Send all regular queries directly to Groq AI in Worker
+        // Route all general queries through Groq
         try {
           const res = await fetch(`${WORKER_URL}/api/ask`, {
             method: "POST",
@@ -420,10 +491,10 @@
           const reply = data.reply || "Systems fully functional, Boss.";
 
           primaryMsg.innerText = reply;
-          subMsg.innerText = "Cloud AI Answered";
+          subMsg.innerText = "Groq LLaMA Engine";
           speak(reply);
         } catch (err) {
-          primaryMsg.innerText = "Cloud relay connection issue.";
+          primaryMsg.innerText = "Cloud connection issue.";
           subMsg.innerText = err.message;
           speak("Link fault encountered, Boss.");
         }
@@ -442,7 +513,7 @@
           subMsg.innerText = "Tap the mic and speak clearly.";
         } else {
           primaryMsg.innerText = "Microphone paused.";
-          subMsg.innerText = `Error: ${e.error}`;
+          subMsg.innerText = `Status: ${e.error}`;
         }
       };
 
@@ -453,13 +524,10 @@
         meterFill.style.width = "20%";
         dbVal.innerText = "-INF dB";
       };
-    } else {
-      primaryMsg.innerText = "Speech API Not Supported";
-      subMsg.innerText = "Please open this page in Google Chrome";
     }
 
-    // Toggle Mic Button
     micBtn.addEventListener("click", () => {
+      requestWakeLock();
       if (!recognition) return;
       if (isListening) {
         recognition.stop();
@@ -472,18 +540,15 @@
       }
     });
 
-    // Text to Speech
     function speak(text) {
       if (!window.speechSynthesis) return;
       window.speechSynthesis.cancel();
       const utterance = new SpeechSynthesisUtterance(text);
       utterance.rate = 1.05;
       utterance.pitch = 0.95;
-      
       const voices = window.speechSynthesis.getVoices();
       const engVoice = voices.find(v => v.lang.includes("en-IN") || v.name.includes("India")) || voices.find(v => v.lang.includes("en"));
       if (engVoice) utterance.voice = engVoice;
-
       window.speechSynthesis.speak(utterance);
     }
   </script>
